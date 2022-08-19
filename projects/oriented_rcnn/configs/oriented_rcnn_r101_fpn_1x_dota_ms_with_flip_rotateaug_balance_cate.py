@@ -120,7 +120,7 @@ dataset = dict(
             dict(
                 type="RandomRotateAug",
                 random_rotate_on=True,
-            ), # this not runned yet
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
