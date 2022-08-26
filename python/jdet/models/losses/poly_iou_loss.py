@@ -2,6 +2,8 @@ import jittor as jt
 from jittor import nn 
 
 from jdet.utils.registry import LOSSES
+from jittor.nn import bmm as bmm
+from copy import deepcopy
 
 
 from jdet.ops.convex_sort import convex_sort
@@ -195,6 +197,7 @@ class PolyIoULoss(nn.Module):
             reduction=reduction,
             avg_factor=avg_factor,
             **kwargs)
+        print(loss)
         return loss
 
 
@@ -223,7 +226,7 @@ class PolyGIoULoss(nn.Module):
         if (weight is not None) and (not jt.any(weight > 0)) and (
                 reduction != 'none'):
             return (pred * weight).sum()  # 0
-        if weight is not None and weight.dim() > 1:
+        if weight is not None and weight.ndim > 1:
             # TODO: remove this in the future
             # reduce the weight of shape (n, 4) to (n,) to match the
             # iou_loss of shape (n,)
@@ -238,3 +241,205 @@ class PolyGIoULoss(nn.Module):
             avg_factor=avg_factor,
             **kwargs)
         return loss
+
+def xy_wh_r_2_xy_sigma(xywhr):
+    """Convert oriented bounding box to 2-D Gaussian distribution.
+
+    Args:
+        xywhr (torch.Tensor): rbboxes with shape (N, 5).
+
+    Returns:
+        xy (torch.Tensor): center point of 2-D Gaussian distribution
+            with shape (N, 2).
+        sigma (torch.Tensor): covariance matrix of 2-D Gaussian distribution
+            with shape (N, 2, 2).
+    """
+    _shape = xywhr.shape
+    assert _shape[-1] == 5
+    xy = xywhr[..., :2]
+    wh = xywhr[..., 2:4].clamp(min_v=1e-7, max_v=1e7).reshape(-1, 2)
+    r = xywhr[..., 4]
+    cos_r = jt.cos(r)
+    sin_r = jt.sin(r)
+    R = jt.stack((cos_r, -sin_r, sin_r, cos_r), dim=-1).reshape(-1, 2, 2)
+    S = 0.5 * jt.stack([jt.misc.diag(wh[i], diagonal=0) for i in range(wh.shape[0])]).reshape(-1, 2, 2)
+    sigma = bmm(bmm(R,S*S),R.permute(0, 2,
+                                            1)).reshape(_shape[:-1] + (2, 2))
+
+    return xy, sigma
+
+
+def postprocess(distance, fun='log1p', tau=1.0):
+
+    if fun == 'log1p':
+        distance = jt.log(distance+1)
+    elif fun == 'sqrt':
+        distance = jt.sqrt(distance.clamp(min_v=1e-7))
+    elif fun == 'none':
+        pass
+    else:
+        raise ValueError(f'Invalid non-linear function {fun}')
+
+    if tau >= 1.0:
+        return 1 - 1 / (tau + distance)
+    else:
+        return distance
+
+
+def kld_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, sqrt=True, weight=None, reduction='mean', avg_factor=None):
+
+    xy_p, Sigma_p = pred
+    xy_t, Sigma_t = target
+    _shape = xy_p.shape
+
+    xy_p = xy_p.reshape(-1, 2)
+    xy_t = xy_t.reshape(-1, 2)
+    Sigma_p = Sigma_p.reshape(-1, 2, 2)
+    Sigma_t = Sigma_t.reshape(-1, 2, 2)
+    Sigma_p_inv = jt.stack((Sigma_p[..., 1, 1], -Sigma_p[..., 0, 1],
+                               -Sigma_p[..., 1, 0], Sigma_p[..., 0, 0]),
+                              dim=-1).reshape(-1, 2, 2) 
+    
+    Sigma_p_inv = Sigma_p_inv / jt.linalg.det(Sigma_p).unsqueeze(-1).unsqueeze(-1)
+
+    dxy = (xy_p - xy_t).unsqueeze(-1)
+    xy_distance = 0.5 * bmm(bmm(dxy.permute(0, 2, 1),(Sigma_p_inv)), dxy).view(-1)
+
+    whr_distance = 0.5 * bmm(Sigma_p_inv,Sigma_t)
+    whr_distance = jt.stack([jt.misc.diag(whr_distance[i]) for i in range(whr_distance.shape[0])]).sum(dim=-1)
+
+
+    Sigma_p_det_log = jt.linalg.det(Sigma_p).log()
+    Sigma_t_det_log = jt.linalg.det(Sigma_t).log()
+
+    whr_distance = whr_distance + 0.5 * (Sigma_p_det_log - Sigma_t_det_log)
+    whr_distance = whr_distance - 1
+    distance = (xy_distance / (alpha * alpha) + whr_distance)
+    if sqrt:
+        distance = distance.clamp(min_v=1e-7).sqrt()
+
+    distance = distance.reshape(_shape[:-1])
+
+    loss = postprocess(distance, fun=fun, tau=tau)
+  
+    if weight is not None:
+        loss *= weight
+        avg_factor = loss.numel()
+    
+    if reduction=="sum":
+        print(loss.sum() )
+        return loss.sum() 
+    elif reduction == "mean":
+        loss = loss.sum()/avg_factor
+        return loss
+    # print(loss)
+    return loss
+
+def gwd_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, weight=None, reduction='mean', avg_factor=None):
+    """Gaussian Wasserstein distance loss.
+
+    """
+    xy_p, Sigma_p = pred
+    xy_t, Sigma_t = target
+
+    xy_distance = ((xy_p - xy_t)*(xy_p - xy_t)).sum(dim=-1)
+    whr_distance = jt.stack([jt.misc.diag(Sigma_p[i]) for i in range(Sigma_p.shape[0])]).sum(dim=-1)
+    whr_distance = whr_distance + jt.stack([jt.misc.diag(Sigma_t[i]) for i in range(Sigma_t.shape[0])]).sum(dim=-1)
+    x_ = bmm(Sigma_p,Sigma_t)
+    _t_tr =jt.stack([jt.misc.diag(x_[i]) for i in range(x_.shape[0])]).sum(dim=-1)
+    _t_det_sqrt = (jt.linalg.det(Sigma_p) * jt.linalg.det(Sigma_t)).clamp(1e-7).sqrt()
+    whr_distance = whr_distance + (-2) * (
+        (_t_tr + 2 * _t_det_sqrt).clamp(1e-7).sqrt())
+    distance = (xy_distance + alpha * alpha * whr_distance).clamp(1e-7).sqrt()
+    if normalize:
+        scale = 2 * (
+            _t_det_sqrt.clamp(1e-7).sqrt().clamp(1e-7).sqrt()).clamp(1e-7)
+        distance = distance / scale
+
+    
+    loss = postprocess(distance, fun=fun, tau=tau)
+
+    
+    if weight is not None:
+        loss *= weight
+    
+    if avg_factor is None:
+        avg_factor = loss.numel()
+    
+    if reduction=="sum":
+        return loss.sum() 
+    elif reduction == "mean":
+        return loss.sum()/avg_factor
+    return loss
+
+@LOSSES.register_module()
+class GDLoss(nn.Module):
+
+    BAG_GD_LOSS = {
+        'gwd': gwd_loss,
+        'kld': kld_loss,
+        # 'jd': jd_loss,
+        # 'kld_symmax': kld_symmax_loss,
+        # 'kld_symmin': kld_symmin_loss
+    }
+    BAG_PREP = {
+        # 'xy_stddev_pearson': xy_stddev_pearson_2_xy_sigma,
+        'xy_wh_r': xy_wh_r_2_xy_sigma
+    }
+
+    def __init__(self,
+                 loss_type,
+                 representation='xy_wh_r',
+                 fun='log1p',
+                 tau=0.0,
+                 alpha=1.0,
+                 reduction='mean',
+                 loss_weight=1.0,
+                 **kwargs):
+        super(GDLoss, self).__init__()
+        assert reduction in ['none', 'sum', 'mean']
+        assert fun in ['log1p', 'none', 'sqrt']
+        assert loss_type in self.BAG_GD_LOSS
+        self.loss = self.BAG_GD_LOSS[loss_type]
+        self.preprocess = self.BAG_PREP[representation]
+        self.fun = fun
+        self.tau = tau
+        self.alpha = alpha
+        self.reduction = reduction
+        self.loss_weight = loss_weight
+        self.kwargs = kwargs
+
+    def execute(self,
+                pred,
+                target,
+                weight=None,
+                avg_factor=None,
+                reduction_override=None,
+                **kwargs):
+
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+        if (weight is not None) and (not jt.any(weight > 0)) and (
+                reduction != 'none'):
+            return (pred * weight).sum()
+        if weight is not None and len(weight.shape) > 1:
+            assert weight.shape == pred.shape
+            weight = weight.mean(-1)
+        _kwargs = deepcopy(self.kwargs)
+        _kwargs.update(kwargs)
+
+        pred = self.preprocess(pred)
+    
+        target = self.preprocess(target)
+
+        return self.loss(
+            pred,
+            target,
+            fun=self.fun,
+            tau=self.tau,
+            alpha=self.alpha,
+            weight=weight,
+            avg_factor=avg_factor,
+            reduction=reduction,
+            **_kwargs) * self.loss_weight
