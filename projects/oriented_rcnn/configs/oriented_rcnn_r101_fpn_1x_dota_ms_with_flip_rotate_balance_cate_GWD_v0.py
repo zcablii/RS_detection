@@ -89,9 +89,8 @@ model = dict(
             ),
         loss_bbox=dict(
             type='GDLoss', 
-            loss_type='kld',
-            fun='log1p',
-            tau=1
+            loss_type='gwd_v0',
+            loss_weight=5.0
             ),
         with_bbox=True,
         with_shared_head=False,
@@ -102,7 +101,7 @@ model = dict(
         end_bbox_type='obb',
         reg_dim=None,
         reg_class_agnostic=True,
-        reg_decoded_bbox=True,
+        reg_decoded_bbox=False,
         pos_weight=-1,
         )
     )
@@ -201,3 +200,4 @@ max_epoch = 12
 eval_interval = 6
 checkpoint_interval = 1
 log_interval = 50
+flip_test = ['H','V','HV']

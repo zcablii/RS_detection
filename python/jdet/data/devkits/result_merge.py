@@ -262,9 +262,9 @@ def mergebase_parallel(srcpath, dstpath, nms):
     pool = Pool(16)
     filelist = util.GetFileFromThisRootDir(srcpath)
 
-    mergesingle_fn = partial(mergesingle, dstpath, nms)
+    mergesingle_fn = partial(mergesingle, dstpath, nms) # = mergesingle(dstpath,nms, filelist[i])
     # pdb.set_trace()
-    pool.map(mergesingle_fn, filelist)
+    pool.map(mergesingle_fn, filelist) # multiprocessing mergesingle_fn on filelist elements
 
 
 def mergebase(srcpath, dstpath, nms):

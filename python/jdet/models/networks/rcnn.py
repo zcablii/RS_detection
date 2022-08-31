@@ -35,14 +35,17 @@ class RCNN(nn.Module):
         
         if self.neck:
             features = self.neck(features)
-
         proposals_list, rpn_losses = self.rpn(features,targets)
-
+        # print('features', len(features) ) # len 5, [8,256,256,256,] -> [8,256,16,16,]
+        # print('proposals_list', len(proposals_list) ) # len = bs, [2000,6,] for each 
+        # print('proposals_list', proposals_list[0] ) # len = bs, [2000,6,] for each 
+        # print('targets_len',len(targets)) # # len = bs, each is dict with rboxes, hboxes, polys, labels, rboxes_ignore, hboxes_ignore, polys_ignore, classes, ...
+        # print('targets',targets[0]['rboxes']) # rboxes shape [n,5]: xyhwt. hboxes shape [n,4]: xyhw. polys shape [n,8] polygons 4 coners
         output = self.bbox_head(features, proposals_list, targets)
-
         if self.is_training():
             output.update(rpn_losses)
             
+        # print('output',output)
         return output
 
     def train(self):

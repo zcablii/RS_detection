@@ -337,12 +337,20 @@ class OrientedHead(nn.Module):
             if pos_inds.any_():
                 
                 if self.reg_decoded_bbox:
+                    # print('rois.shape',rois.shape,bbox_pred.shape) # rois 4096,6  bbox_pred 4096,5
                     bbox_pred = self.bbox_coder.decode(rois[:, 1:], bbox_pred)
                 if self.reg_class_agnostic:
                     pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), self.reg_dim)[pos_inds.astype(jt.bool)]
+                    # print('pos_bbox_pred',pos_bbox_pred.shape,pos_bbox_pred) # shape num_pos ,5
                 else:
                     pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1, self.reg_dim)[pos_inds.astype(jt.bool), labels[pos_inds.astype(jt.bool)]]
-                
+                # print('len(pos_bbox_pred)',len(pos_bbox_pred))
+                # print('pos_bbox_pred',pos_bbox_pred)
+                # print('[pos_inds.astype(jt.bool)]',len(bbox_targets[pos_inds.astype(jt.bool)]),bbox_targets[pos_inds.astype(jt.bool)])
+                # print('pos_bbox_pred',pos_bbox_pred)
+                # print('bbox_targets[pos_inds.astype(jt.bool)]',bbox_targets[pos_inds.astype(jt.bool)])
+                # print('bbox_weights[pos_inds.astype(jt.bool)]',bbox_weights[pos_inds.astype(jt.bool)])
+                # print('shapes',pos_bbox_pred.shape, bbox_targets[pos_inds.astype(jt.bool)].shape, bbox_weights[pos_inds.astype(jt.bool)].shape)
                 losses['orcnn_bbox_loss'] = self.loss_bbox(
                     pos_bbox_pred,
                     bbox_targets[pos_inds.astype(jt.bool)],
@@ -358,6 +366,7 @@ class OrientedHead(nn.Module):
 
         num_pos = pos_bboxes.size(0)
         num_neg = neg_bboxes.size(0)
+        # print('num_pos,num_neg',num_pos,num_neg)
         num_samples = num_pos + num_neg
 
         # original implementation uses new_zeros since BG are set to be 0
@@ -391,7 +400,10 @@ class OrientedHead(nn.Module):
         neg_bboxes_list = [res.neg_bboxes for res in sampling_results]
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
         pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
-
+        # print('pos_bboxes_list',pos_bboxes_list)
+        # print('neg_bboxes_list',neg_bboxes_list)
+        # print('pos_gt_bboxes_list',pos_gt_bboxes_list)
+        # print('pos_gt_labels_list',pos_gt_labels_list)
         outputs = multi_apply(
             self.get_bboxes_target_single,
             pos_bboxes_list,
@@ -406,7 +418,10 @@ class OrientedHead(nn.Module):
             label_weights = jt.concat(label_weights, 0)
             bbox_targets = jt.concat(bbox_targets, 0)
             bbox_weights = jt.concat(bbox_weights, 0)
-
+        # print('labels',len(labels),labels)
+        # print('label_weights',len(label_weights),label_weights)
+        # print('bbox_targets',len(bbox_targets),bbox_targets)
+        # print('bbox_weights',len(bbox_weights),bbox_weights)
         return (labels, label_weights, bbox_targets, bbox_weights)
 
     def get_bboxes(self, rois, cls_score, bbox_pred, img_shape, scale_factor, rescale=False):
@@ -504,9 +519,12 @@ class OrientedHead(nn.Module):
                     
 
             scores, bbox_deltas, rois = self.forward_single(x, sampling_results, test=False)
+            # print('scores', scores[0]) # len 4096, num_classes + 1
+            # print('bbox_deltas', bbox_deltas[0])# len 4096,5, 5param deltas
+            # print('rois', rois[0])# len 4096,6
 
             bbox_targets = self.get_bboxes_targets(sampling_results)
-
+            # print('bbox_targets'), bbox_targets)# labels, label_weights, bbox_targets, bbox_weights each len 4096
             loss = self.loss(scores, bbox_deltas, rois, *bbox_targets)
 
             return loss

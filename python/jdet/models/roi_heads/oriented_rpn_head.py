@@ -482,7 +482,7 @@ class OrientedRPNHead(nn.Module):
     def execute(self, features, targets):
 
         outs = multi_apply(self.forward_single, features)
-        
+        # print('outs',outs)
         if self.is_training():
             losses = self.loss(*outs,targets)
         else:

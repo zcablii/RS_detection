@@ -197,7 +197,6 @@ class PolyIoULoss(nn.Module):
             reduction=reduction,
             avg_factor=avg_factor,
             **kwargs)
-        print(loss)
         return loss
 
 
@@ -286,7 +285,7 @@ def postprocess(distance, fun='log1p', tau=1.0):
         return distance
 
 
-def kld_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, sqrt=True, weight=None, reduction='mean', avg_factor=None):
+def kld_loss_v0(pred, target, fun='log1p', tau=1.0, alpha=1.0, sqrt=True, weight=None, reduction='mean', avg_factor=None):
 
     xy_p, Sigma_p = pred
     xy_t, Sigma_t = target
@@ -324,18 +323,62 @@ def kld_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, sqrt=True, weight=No
   
     if weight is not None:
         loss *= weight
+    
+    if avg_factor is None:
         avg_factor = loss.numel()
     
     if reduction=="sum":
-        print(loss.sum() )
+        return loss.sum() 
+    elif reduction == "mean":
+        return loss.sum()/avg_factor
+    return loss
+
+
+
+
+def kld_loss(pred, target, fun='log1p', tau=1.0, weight=None, reduction='mean', avg_factor=None):
+    xy_p, Sigma_p = pred
+    xy_t, Sigma_t = target
+
+    xy_p = xy_p.reshape(-1, 2)
+    xy_t = xy_t.reshape(-1, 2)
+    Sigma_p = Sigma_p.reshape(-1, 2, 2)
+    Sigma_t = Sigma_t.reshape(-1, 2, 2)
+
+    
+    delta = (xy_p - xy_t).unsqueeze(-1)
+    sigma_t_inv = jt.linalg.inv(Sigma_t)
+    term1 = delta.transpose(-1,
+                            -2).matmul(sigma_t_inv).matmul(delta).squeeze(-1)
+    x_ = sigma_t_inv.matmul(Sigma_p)
+    term2_ = jt.stack([jt.misc.diag(x_[i]) for i in range(x_.shape[0])]).sum(dim=-1).reshape(-1,1)
+    term2 = term2_ + jt.log(jt.linalg.det(Sigma_t) / jt.linalg.det(Sigma_p)).reshape(-1, 1)
+    
+    dis = term1 + term2 - 2
+    kl_dis = dis.clamp(min_v=1e-6)
+
+    if fun == 'sqrt':
+        loss = 1 - 1 / (tau + jt.sqrt(kl_dis))
+    else:
+        loss = 1 - 1 / (tau + jt.log(kl_dis+1))
+    # return kl_loss
+ 
+    if weight is not None:
+        loss *= weight
+    
+    if avg_factor is None:
+        avg_factor = loss.numel()
+    
+    if reduction=="sum":
         return loss.sum() 
     elif reduction == "mean":
         loss = loss.sum()/avg_factor
+        # print('jt.grad(loss, Sigma_p)', jt.grad(loss, Sigma_p))
         return loss
-    # print(loss)
     return loss
 
-def gwd_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, weight=None, reduction='mean', avg_factor=None):
+
+def gwd_loss_v0(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, weight=None, reduction='mean', avg_factor=None):
     """Gaussian Wasserstein distance loss.
 
     """
@@ -343,6 +386,7 @@ def gwd_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, weig
     xy_t, Sigma_t = target
 
     xy_distance = ((xy_p - xy_t)*(xy_p - xy_t)).sum(dim=-1)
+    
     whr_distance = jt.stack([jt.misc.diag(Sigma_p[i]) for i in range(Sigma_p.shape[0])]).sum(dim=-1)
     whr_distance = whr_distance + jt.stack([jt.misc.diag(Sigma_t[i]) for i in range(Sigma_t.shape[0])]).sum(dim=-1)
     x_ = bmm(Sigma_p,Sigma_t)
@@ -372,15 +416,52 @@ def gwd_loss(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, weig
         return loss.sum()/avg_factor
     return loss
 
+def gwd_loss(pred, target, fun='sqrt', tau=2.0, normalize=True, weight=None, reduction='mean', avg_factor=None):
+    """Gaussian Wasserstein distance loss.
+    """
+    xy_p, Sigma_p = pred
+    xy_t, Sigma_t = target
+
+    xy_distance = ((xy_p - xy_t)*(xy_p - xy_t)).sum(dim=-1)
+
+    whr_distance = jt.stack([jt.misc.diag(Sigma_p[i]) for i in range(Sigma_p.shape[0])]).sum(dim=-1)
+    whr_distance = whr_distance + jt.stack([jt.misc.diag(Sigma_t[i]) for i in range(Sigma_t.shape[0])]).sum(dim=-1)
+    x_ = bmm(Sigma_p,Sigma_t)
+    _t_tr =jt.stack([jt.misc.diag(x_[i]) for i in range(x_.shape[0])]).sum(dim=-1)
+    _t_det_sqrt = (jt.linalg.det(Sigma_p) * jt.linalg.det(Sigma_t)).clamp(0).sqrt()
+    whr_distance = whr_distance + (-2) * (
+        (_t_tr + 2 * _t_det_sqrt).clamp(0).sqrt())
+    distance = xy_distance + whr_distance
+    gwd_dis = distance.clamp(min_v=1e-6)
+    if fun == 'sqrt':
+        loss = 1 - 1 / (tau + jt.sqrt(gwd_dis))
+    elif fun == 'log1p':
+        loss = 1 - 1 / (tau + jt.log(gwd_dis+1))
+    else:
+        scale = 2 * (_t_det_sqrt.sqrt().sqrt()).clamp(1e-7)
+        loss = jt.log1p(jt.sqrt(gwd_dis) / scale)
+    
+    if weight is not None:
+        loss *= weight
+    
+    if avg_factor is None:
+        avg_factor = loss.numel()
+    
+    if reduction=="sum":
+        return loss.sum() 
+    elif reduction == "mean":
+        return loss.sum()/avg_factor
+    
+    return loss
+
 @LOSSES.register_module()
 class GDLoss(nn.Module):
 
     BAG_GD_LOSS = {
+        'gwd_v0': gwd_loss_v0,
+        'kld_v0': kld_loss_v0,
         'gwd': gwd_loss,
         'kld': kld_loss,
-        # 'jd': jd_loss,
-        # 'kld_symmax': kld_symmax_loss,
-        # 'kld_symmin': kld_symmin_loss
     }
     BAG_PREP = {
         # 'xy_stddev_pearson': xy_stddev_pearson_2_xy_sigma,
@@ -391,7 +472,7 @@ class GDLoss(nn.Module):
                  loss_type,
                  representation='xy_wh_r',
                  fun='log1p',
-                 tau=0.0,
+                 tau=1.0,
                  alpha=1.0,
                  reduction='mean',
                  loss_weight=1.0,
@@ -429,17 +510,17 @@ class GDLoss(nn.Module):
         _kwargs = deepcopy(self.kwargs)
         _kwargs.update(kwargs)
 
-        pred = self.preprocess(pred)
+        pred_ = self.preprocess(pred)
     
-        target = self.preprocess(target)
-
-        return self.loss(
-            pred,
-            target,
+        target_ = self.preprocess(target)
+        loss = self.loss(
+            pred_,
+            target_,
             fun=self.fun,
             tau=self.tau,
-            alpha=self.alpha,
             weight=weight,
             avg_factor=avg_factor,
             reduction=reduction,
             **_kwargs) * self.loss_weight
+        # print('loss',loss)
+        return loss

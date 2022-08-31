@@ -267,9 +267,9 @@ def choose_best_match_batch(Rrois, gt_rois):
 
 def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
     gt_boxes_new = choose_best_match_batch(Rrois, gt)
-    bbox_targets = dbbox2delta_v2(Rrois, gt_boxes_new, means, stds)
+    # bbox_targets = dbbox2delta_v2(Rrois, gt_boxes_new, means, stds) # here use full box rep.
 
-    return bbox_targets
+    return gt_boxes_new
 
 def dbbox2result(dbboxes, labels, num_classes):
     dbboxes = dbboxes

@@ -55,7 +55,7 @@ model = dict(
     ),
     bbox_head=dict(
         type='OrientedHead',
-        num_classes=15,
+        num_classes=10,
         in_channels=256,
         fc_out_channels=1024,
         score_thresh=0.05,
@@ -89,7 +89,8 @@ model = dict(
             ),
         loss_bbox=dict(
             type='GDLoss', 
-            loss_type='gwd'
+            loss_type='gwd',
+            loss_weight=5.0
             ),
         with_bbox=True,
         with_shared_head=False,
@@ -100,7 +101,7 @@ model = dict(
         end_bbox_type='obb',
         reg_dim=None,
         reg_class_agnostic=True,
-        reg_decoded_bbox=False,
+        reg_decoded_bbox=True,
         pos_weight=-1,
         )
     )
@@ -196,6 +197,6 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 100
+eval_interval = 6
 checkpoint_interval = 1
 log_interval = 50

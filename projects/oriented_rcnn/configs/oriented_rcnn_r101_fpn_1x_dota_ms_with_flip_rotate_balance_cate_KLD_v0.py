@@ -15,7 +15,7 @@ model = dict(
     rpn = dict(
         type = "OrientedRPNHead",
         in_channels=256,
-        num_classes=1,
+        num_classes=10,
         min_bbox_size=0,
         nms_thresh=0.8,
         nms_pre=2000,
@@ -89,7 +89,7 @@ model = dict(
             ),
         loss_bbox=dict(
             type='GDLoss', 
-            loss_type='kld',
+            loss_type='kld_v0',
             fun='log1p',
             tau=1
             ),

@@ -126,7 +126,7 @@ def rbbox_target_rbbox_single(pos_rbboxes,
     label_weights = jt.zeros(num_samples)
     bbox_targets = jt.zeros((num_samples, 5))
     bbox_weights = jt.zeros((num_samples, 5))
-
+    # print('bbox_targets',pos_gt_rbboxes)
     if num_pos > 0:
         labels[:num_pos] = pos_gt_labels
         pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
@@ -136,7 +136,6 @@ def rbbox_target_rbbox_single(pos_rbboxes,
         bbox_weights[:num_pos, :] = 1
     if num_neg > 0:
         label_weights[-num_neg:] = 1.0
-
     return labels, label_weights, bbox_targets, bbox_weights
 
 def accuracy(pred, target, topk=1):
@@ -368,6 +367,11 @@ class BBoxHeadRbbox(nn.Module):
             else:
                 pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1,
                                                5)[pos_inds, labels[pos_inds]]
+            
+            # print('pos_bbox_pred', pos_bbox_pred)
+            # print('bbox_targets[pos_inds]', bbox_targets[pos_inds])
+            # print('bbox_weights[pos_inds]', bbox_weights[pos_inds])
+            # print('shapes', pos_bbox_pred.shape, bbox_targets[pos_inds].shape, bbox_weights[pos_inds].shape)
             losses['rbbox_loss_bbox'] = self.loss_bbox(
                 pos_bbox_pred,
                 bbox_targets[pos_inds],

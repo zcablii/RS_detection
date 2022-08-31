@@ -26,7 +26,7 @@ def flip_box(box, target):
             ans[i] = h - ans[i]
     return ans
 
-def prepare_data(result_pkl,save_path, classes):
+def prepare_data(result_pkl,save_path, classes): # write filename,score,box into before_nms each class txt
     check_dir(save_path)
     results = jt.load(result_pkl)
     data = {}
@@ -49,8 +49,8 @@ def prepare_data(result_pkl,save_path, classes):
 
 def data_merge(result_pkl, save_path, final_path,dataset_type):
     classes = get_classes_by_name(dataset_type)
-    prepare_data(result_pkl,save_path, classes)
-    check_dir(final_path)
+    prepare_data(result_pkl,save_path, classes) # pkl, before_nms
+    check_dir(final_path) # after_nms
     mergebypoly(save_path,final_path)
 
 def data_merge_result(result_pkl,work_dir,epoch,name,dataset_type,images_dir=""):
