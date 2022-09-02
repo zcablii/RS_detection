@@ -265,11 +265,13 @@ def choose_best_match_batch(Rrois, gt_rois):
 
     return gt_rois_new
 
-def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1]):
+def best_match_dbbox2delta(Rrois, gt, means = [0, 0, 0, 0, 0], stds=[1, 1, 1, 1, 1],use_decode=False):
     gt_boxes_new = choose_best_match_batch(Rrois, gt)
-    # bbox_targets = dbbox2delta_v2(Rrois, gt_boxes_new, means, stds) # here use full box rep.
+    if use_decode:
+        return gt_boxes_new
+    bbox_targets = dbbox2delta_v2(Rrois, gt_boxes_new, means, stds) # here use full box rep.
 
-    return gt_boxes_new
+    return bbox_targets
 
 def dbbox2result(dbboxes, labels, num_classes):
     dbboxes = dbboxes

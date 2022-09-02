@@ -187,3 +187,67 @@ class SharedFCBBoxHeadRbbox(ConvFCBBoxHeadRbbox):
             fc_out_channels=fc_out_channels,
             *args,
             **kwargs)
+
+def accuracy(pred, target, topk=1):
+    if isinstance(topk, int):
+        topk = (topk, )
+        return_single = True
+    else:
+        return_single = False
+
+    maxk = max(topk)
+    _, pred_label = pred.topk(maxk, 1, True, True)
+    pred_label = pred_label.t()
+    correct = pred_label.equal(target.view(1, -1).expand_as(pred_label))
+
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0, keepdims=True)
+#        res.append(correct_k.mul_(100.0 / pred.size(0)))
+        correct_k *= 100.0 / pred.shape[0]
+        res.append(correct_k)
+    return res[0] if return_single else res
+
+
+@HEADS.register_module()
+class KFIoUSharedFCBBoxHeadRbbox(ConvFCBBoxHeadRbbox):
+
+    def __init__(self, num_fcs=2, fc_out_channels=1024, *args, **kwargs):
+        assert num_fcs >= 1
+        super(KFIoUSharedFCBBoxHeadRbbox, self).__init__(
+            num_shared_convs=0,
+            num_shared_fcs=num_fcs,
+            num_cls_convs=0,
+            num_cls_fcs=0,
+            num_reg_convs=0,
+            num_reg_fcs=0,
+            fc_out_channels=fc_out_channels,
+            *args,
+            **kwargs)
+
+    def loss(self,cls_score, bbox_pred, bbox_pred_decode,labels, label_weights, bbox_targets, bbox_targets_decode,bbox_weights,reduce=True):
+        losses = dict()
+        if cls_score is not None:
+            losses['rbbox_loss_cls'] = self.loss_cls(
+                cls_score, labels, label_weights, reduce=reduce)
+            losses['rbbox_acc'] = accuracy(cls_score, labels)
+        if bbox_pred is not None:
+            pos_inds = labels > 0
+            if self.reg_class_agnostic:
+                pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), 5)[pos_inds]
+                pos_bbox_pred_decode = bbox_pred_decode.view(bbox_pred_decode.size(0), 5)[pos_inds]
+            else:
+                pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1,
+                                               5)[pos_inds, labels[pos_inds]]
+                pos_bbox_pred_decode = bbox_pred_decode.view(bbox_pred_decode.size(0), -1,
+                                               5)[pos_inds, labels[pos_inds]]
+
+            losses['rbbox_loss_bbox'] = self.loss_bbox(
+                pos_bbox_pred,
+                bbox_targets[pos_inds],
+                weight=bbox_weights[pos_inds],
+                pred_decode = pos_bbox_pred_decode,
+                targets_decode  = bbox_targets_decode[pos_inds],
+                avg_factor=bbox_targets.size(0))
+
+        return losses

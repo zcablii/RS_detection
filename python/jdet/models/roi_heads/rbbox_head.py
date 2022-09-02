@@ -91,7 +91,7 @@ def rbbox_target_rbbox(pos_rbboxes_list,
                          reg_classes=1,
                          target_means=[.0, .0, .0, .0, 0],
                          target_stds=[1.0, 1.0, 1.0, 1.0, 1.0],
-                         concat=True):
+                         concat=True,use_decode=False):
     labels, label_weights, bbox_targets, bbox_weights = multi_apply(
         rbbox_target_rbbox_single,
         pos_rbboxes_list,
@@ -101,7 +101,7 @@ def rbbox_target_rbbox(pos_rbboxes_list,
         cfg=cfg,
         reg_classes=reg_classes,
         target_means=target_means,
-        target_stds=target_stds)
+        target_stds=target_stds, use_decode=use_decode)
 
     if concat:
         labels = jt.contrib.concat(labels, 0)
@@ -117,7 +117,7 @@ def rbbox_target_rbbox_single(pos_rbboxes,
                        cfg,
                        reg_classes=1,
                        target_means=[.0, .0, .0, .0, .0],
-                       target_stds=[1.0, 1.0, 1.0, 1.0, 1.0]):
+                       target_stds=[1.0, 1.0, 1.0, 1.0, 1.0], use_decode=False):
     assert pos_rbboxes.size(1) == 5
     num_pos = pos_rbboxes.size(0)
     num_neg = neg_rbboxes.size(0)
@@ -131,7 +131,7 @@ def rbbox_target_rbbox_single(pos_rbboxes,
         labels[:num_pos] = pos_gt_labels
         pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
         label_weights[:num_pos] = pos_weight
-        pos_bbox_targets = best_match_dbbox2delta(pos_rbboxes, pos_gt_rbboxes, target_means, target_stds)
+        pos_bbox_targets = best_match_dbbox2delta(pos_rbboxes, pos_gt_rbboxes, target_means, target_stds, use_decode)
         bbox_targets[:num_pos, :] = pos_bbox_targets
         bbox_weights[:num_pos, :] = 1
     if num_neg > 0:
@@ -255,7 +255,7 @@ class BBoxHeadRbbox(nn.Module):
         return cls_reg_targets
 
     def get_target_rbbox(self, sampling_results, gt_bboxes, gt_labels,
-                   rcnn_train_cfg):
+                   rcnn_train_cfg,use_decode=False):
         pos_proposals = [res.pos_bboxes for res in sampling_results]
         neg_proposals = [res.neg_bboxes for res in sampling_results]
         pos_gt_bboxes = [res.pos_gt_bboxes for res in sampling_results]
@@ -269,7 +269,7 @@ class BBoxHeadRbbox(nn.Module):
             rcnn_train_cfg,
             reg_classes,
             target_means=self.target_means,
-            target_stds=self.target_stds)
+            target_stds=self.target_stds, use_decode=use_decode)
         return cls_reg_targets
 
     def get_det_bboxes(self,

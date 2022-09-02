@@ -287,8 +287,11 @@ def postprocess(distance, fun='log1p', tau=1.0):
 
 def kld_loss_v0(pred, target, fun='log1p', tau=1.0, alpha=1.0, sqrt=True, weight=None, reduction='mean', avg_factor=None):
 
-    xy_p, Sigma_p = pred
-    xy_t, Sigma_t = target
+    
+    xy_p = pred[:, :2]
+    xy_t = target[:, :2]
+    _, Sigma_p = xy_wh_r_2_xy_sigma(pred)
+    _, Sigma_t = xy_wh_r_2_xy_sigma(target)
     _shape = xy_p.shape
 
     xy_p = xy_p.reshape(-1, 2)
@@ -337,8 +340,11 @@ def kld_loss_v0(pred, target, fun='log1p', tau=1.0, alpha=1.0, sqrt=True, weight
 
 
 def kld_loss(pred, target, fun='log1p', tau=1.0, weight=None, reduction='mean', avg_factor=None):
-    xy_p, Sigma_p = pred
-    xy_t, Sigma_t = target
+    
+    xy_p = pred[:, :2]
+    xy_t = target[:, :2]
+    _, Sigma_p = xy_wh_r_2_xy_sigma(pred)
+    _, Sigma_t = xy_wh_r_2_xy_sigma(target)
 
     xy_p = xy_p.reshape(-1, 2)
     xy_t = xy_t.reshape(-1, 2)
@@ -382,8 +388,11 @@ def gwd_loss_v0(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, w
     """Gaussian Wasserstein distance loss.
 
     """
-    xy_p, Sigma_p = pred
-    xy_t, Sigma_t = target
+    
+    xy_p = pred[:, :2]
+    xy_t = target[:, :2]
+    _, Sigma_p = xy_wh_r_2_xy_sigma(pred)
+    _, Sigma_t = xy_wh_r_2_xy_sigma(target)
 
     xy_distance = ((xy_p - xy_t)*(xy_p - xy_t)).sum(dim=-1)
     
@@ -419,8 +428,11 @@ def gwd_loss_v0(pred, target, fun='log1p', tau=1.0, alpha=1.0, normalize=True, w
 def gwd_loss(pred, target, fun='sqrt', tau=2.0, normalize=True, weight=None, reduction='mean', avg_factor=None):
     """Gaussian Wasserstein distance loss.
     """
-    xy_p, Sigma_p = pred
-    xy_t, Sigma_t = target
+    
+    xy_p = pred[:, :2]
+    xy_t = target[:, :2]
+    _, Sigma_p = xy_wh_r_2_xy_sigma(pred)
+    _, Sigma_t = xy_wh_r_2_xy_sigma(target)
 
     xy_distance = ((xy_p - xy_t)*(xy_p - xy_t)).sum(dim=-1)
 
@@ -450,9 +462,99 @@ def gwd_loss(pred, target, fun='sqrt', tau=2.0, normalize=True, weight=None, red
     if reduction=="sum":
         return loss.sum() 
     elif reduction == "mean":
+        if jt.misc.isnan(jt.grad(loss, Sigma_p)).any() or ((target>1e5).nonzero()).any() or ((target<-1e5).nonzero()).any():
+            print('jt.grad(loss, Sigma_p)', jt.grad(loss, Sigma_p))
+            print('jt.grad(loss, Sigma_p)', jt.grad(loss, Sigma_t))
+            idx = (jt.misc.isnan(jt.grad(loss, Sigma_p))).nonzero()[0]
+            print('nan pred', pred[idx[0]][idx[1]])
+            print('nan target', target[idx[0]][idx[1]])
+            idx = (jt.misc.isnan(jt.grad(loss, Sigma_p))).nonzero()[1]
+            print('nan pred', pred[idx[0]][idx[1]])
+            print('nan target', target[idx[0]][idx[1]])
+
         return loss.sum()/avg_factor
     
     return loss
+
+def kfiou_loss(pred,
+               target,
+               pred_decode=None,
+               targets_decode=None,
+               fun=None,
+               tau = None,
+               beta=1.0 / 9.0,
+               eps=1e-6,weight=None, reduction='mean', avg_factor=None):
+    xy_p = pred[:, :2]
+    xy_t = target[:, :2]
+    _, Sigma_p = xy_wh_r_2_xy_sigma(pred_decode)
+    _, Sigma_t = xy_wh_r_2_xy_sigma(targets_decode)
+    # Smooth-L1 norm
+    diff = jt.abs(xy_p - xy_t)
+    xy_loss = jt.where(diff < beta, 0.5 * diff * diff / beta,
+                          diff - 0.5 * beta).sum(dim=-1)
+    Vb_p = 4 * jt.linalg.det(Sigma_p).sqrt()
+    Vb_t = 4 * jt.linalg.det(Sigma_t).sqrt()
+
+    sigam_sum = Sigma_p + Sigma_t
+    K = bmm(Sigma_p,jt.linalg.inv(sigam_sum))
+    Sigma = Sigma_p - bmm(K,Sigma_p)
+    Vb = 4 * jt.linalg.det(Sigma).sqrt()
+    Vb = jt.where(jt.isnan(Vb), jt.full_like(Vb, 0), Vb)
+    KFIoU = Vb / (Vb_p + Vb_t - Vb + eps)
+
+    if fun == 'ln':
+        kf_loss = -jt.log(KFIoU + eps)
+    elif fun == 'exp':
+        kf_loss = jt.exp(1 - KFIoU) - 1
+    else:
+        kf_loss = 1 - KFIoU
+
+    loss = (xy_loss + kf_loss).clamp(0)
+
+    if weight is not None:
+        loss *= weight
+    
+    if avg_factor is None:
+        avg_factor = loss.numel()
+    
+    if reduction=="sum":
+        return loss.sum() 
+    elif reduction == "mean":
+        if jt.misc.isnan(jt.grad(loss, Sigma_p)).any() or ((target>1e5).nonzero()).any() or ((target<-1e5).nonzero()).any():
+            
+            print('jt.grad(loss, Sigma_p)', jt.grad(loss, Sigma_p))
+            print('jt.grad(loss, Sigma_p)', jt.grad(loss, Sigma_t))
+                
+            if (target>1e5).nonzero().any():
+                idx = (target>1e5).nonzero()[0]
+                print('nan exp', idx,(target>1e5).nonzero())
+                print('nan exp pred', pred[idx[0]][idx[1]])
+                print('nan exp target', target[idx[0]][idx[1]])
+                print('nan exp pred_decode', pred_decode[idx[0]][idx[1]])
+                print('nan exp targets_decode', targets_decode[idx[0]][idx[1]])
+            if (target<-1e5).nonzero().any():
+                idx = (target<-1e5).nonzero()[0]
+                print('nan -exp', idx, (target<-1e5).nonzero())
+                print('nan -exp pred', pred[idx[0]][idx[1]])
+                print('nan -exp target', target[idx[0]][idx[1]])
+                print('nan -exp pred_decode', pred_decode[idx[0]][idx[1]])
+                print('nan -exp targets_decode', targets_decode[idx[0]][idx[1]])
+            if jt.misc.isnan(jt.grad(loss, Sigma_p)).any():
+                idx = (jt.misc.isnan(jt.grad(loss, Sigma_p))).nonzero()[0]
+                print('nan ',idx,(jt.misc.isnan(jt.grad(loss, Sigma_p))).nonzero())
+                print('nan pred', pred[idx[0]][idx[1]])
+                print('nan target', target[idx[0]][idx[1]])
+                print('nan pred_decode', pred_decode[idx[0]][idx[1]])
+                print('nan targets_decode', targets_decode[idx[0]][idx[1]])
+                idx = (jt.misc.isnan(jt.grad(loss, Sigma_p))).nonzero()[1]
+                print('nan pred', pred[idx[0]][idx[1]])
+                print('nan target', target[idx[0]][idx[1]])
+                print('nan pred_decode', pred_decode[idx[0]][idx[1]])
+                print('nan targets_decode', targets_decode[idx[0]][idx[1]])
+        return loss.sum()/avg_factor
+
+    return loss
+
 
 @LOSSES.register_module()
 class GDLoss(nn.Module):
@@ -462,6 +564,7 @@ class GDLoss(nn.Module):
         'kld_v0': kld_loss_v0,
         'gwd': gwd_loss,
         'kld': kld_loss,
+        'kfiou': kfiou_loss,
     }
     BAG_PREP = {
         # 'xy_stddev_pearson': xy_stddev_pearson_2_xy_sigma,
@@ -479,8 +582,9 @@ class GDLoss(nn.Module):
                  **kwargs):
         super(GDLoss, self).__init__()
         assert reduction in ['none', 'sum', 'mean']
-        assert fun in ['log1p', 'none', 'sqrt']
+        assert fun in ['log1p', 'none', 'sqrt','ln','exp']
         assert loss_type in self.BAG_GD_LOSS
+        self.loss_type = loss_type
         self.loss = self.BAG_GD_LOSS[loss_type]
         self.preprocess = self.BAG_PREP[representation]
         self.fun = fun
@@ -496,6 +600,8 @@ class GDLoss(nn.Module):
                 weight=None,
                 avg_factor=None,
                 reduction_override=None,
+                pred_decode = None,
+                targets_decode  = None,
                 **kwargs):
 
         assert reduction_override in (None, 'none', 'mean', 'sum')
@@ -510,17 +616,29 @@ class GDLoss(nn.Module):
         _kwargs = deepcopy(self.kwargs)
         _kwargs.update(kwargs)
 
-        pred_ = self.preprocess(pred)
-    
-        target_ = self.preprocess(target)
-        loss = self.loss(
-            pred_,
-            target_,
-            fun=self.fun,
-            tau=self.tau,
-            weight=weight,
-            avg_factor=avg_factor,
-            reduction=reduction,
-            **_kwargs) * self.loss_weight
-        # print('loss',loss)
+        # print('pred',pred.shape,pred[:3])
+        # print('target',target.shape,target[:3])
+        if self.loss_type == 'kfiou':  
+            loss = self.loss(
+                pred,
+                target,
+                fun=self.fun,
+                tau=self.tau,
+                weight=weight,
+                avg_factor=avg_factor,
+                reduction=reduction,
+                pred_decode=pred_decode,
+                targets_decode=targets_decode,
+                **_kwargs) * self.loss_weight
+        else:
+            loss = self.loss(
+                pred,
+                target,
+                fun=self.fun,
+                tau=self.tau,
+                weight=weight,
+                avg_factor=avg_factor,
+                reduction=reduction,
+                **_kwargs) * self.loss_weight
+        # print('Loss', loss)
         return loss
