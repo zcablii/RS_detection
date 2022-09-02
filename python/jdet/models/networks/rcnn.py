@@ -30,13 +30,13 @@ class RCNN(nn.Module):
             results: detections
             losses (dict): losses
         '''
-
+        print(images.shape)
         features = self.backbone(images)
         
         if self.neck:
             features = self.neck(features)
         proposals_list, rpn_losses = self.rpn(features,targets)
-        print('features',features[0][0][0][0][0])
+        # print('features',features[0][0][0][0][0])
         # print('features', len(features) ) # len 5, [8,256,256,256,] -> [8,256,16,16,]
         # print('proposals_list', len(proposals_list) ) # len = bs, [2000,6,] for each 
         # print('proposals_list', proposals_list[0] ) # len = bs, [2000,6,] for each 
