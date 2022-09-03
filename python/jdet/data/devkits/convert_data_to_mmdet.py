@@ -10,7 +10,7 @@ from tqdm import tqdm
 from jdet.config.constant import get_classes_by_name
 
 
-def parse_ann_info(label_base_path, img_name, label_ids):
+def parse_ann_info(label_base_path, img_name, label_ids, angle_version):
     lab_path = osp.join(label_base_path, img_name + '.txt')
     bboxes, labels, bboxes_ignore, labels_ignore = [], [], [], []
     with open(lab_path, 'r') as f:
@@ -18,7 +18,7 @@ def parse_ann_info(label_base_path, img_name, label_ids):
             ann_line = ann_line.strip().split(' ')
             bbox = [float(ann_line[i]) for i in range(8)]
             # 8 point to 5 point xywha
-            bbox = tuple(poly_to_rotated_box_single(bbox).tolist())
+            bbox = tuple(poly_to_rotated_box_single(bbox,angle_version).tolist())
             class_name = ann_line[8]
             difficult = int(ann_line[9])
             # ignore difficult =2
@@ -31,7 +31,7 @@ def parse_ann_info(label_base_path, img_name, label_ids):
     return bboxes, labels, bboxes_ignore, labels_ignore
 
 
-def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=True, ext='.png', type=''):
+def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=True, ext='.png', type='',angle_version = 'le135'):
     """Generate .pkl format annotation that is consistent with mmdet.
     Args:
         src_path: dataset path containing images and labelTxt folders.
@@ -60,7 +60,7 @@ def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
             # filter images without gt to speed up training
             if filter_empty_gt & (osp.getsize(label) == 0):
                 continue
-            bboxes, labels, bboxes_ignore, labels_ignore = parse_ann_info(label_path, img_name, label_ids)
+            bboxes, labels, bboxes_ignore, labels_ignore = parse_ann_info(label_path, img_name, label_ids, angle_version)
             ann = {}
             ann['bboxes'] = np.array(bboxes, dtype=np.float32)
             ann['labels'] = np.array(labels, dtype=np.int64)

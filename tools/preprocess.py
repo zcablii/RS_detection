@@ -45,7 +45,7 @@ def run(cfg):
                     plus=False
                 )
 
-            convert_data_to_mmdet(out_path, os.path.join(out_path, 'labels.pkl'), type=cfg.type)
+            convert_data_to_mmdet(out_path, os.path.join(out_path, 'labels.pkl'), type=cfg.type, angle_version = cfg.angle_version)
         return
 
     if (cfg.type=='FAIR' or cfg.type=='FAIR1M_1_5'):
@@ -94,7 +94,7 @@ def run(cfg):
         if (label != "test"):
             print("converting to mmdet format...")
             print(cfg.type)
-            convert_data_to_mmdet(target_path, os.path.join(target_path, 'labels.pkl'), type=cfg.type)
+            convert_data_to_mmdet(target_path, os.path.join(target_path, 'labels.pkl'), type=cfg.type, angle_version = cfg.angle_version)
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor DOTA data preprocess")

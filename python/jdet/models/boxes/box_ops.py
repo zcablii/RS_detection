@@ -173,7 +173,11 @@ def bbox_iou_per_box(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=Fal
     else:
         return iou  # IoU
 
-def norm_angle(angle, range=[float(-np.pi / 4), float(np.pi)]):
+def norm_angle(angle, angle_version='le135'):
+    if angle_version=='le90':
+        range=[float(-np.pi / 2), float(np.pi)]
+    else:
+        range=[float(-np.pi / 4), float(np.pi)]
     ret = (angle - range[0]) % range[1] + range[0]
     return ret
 
@@ -433,7 +437,7 @@ def delta2bbox(rois,
     return bboxes
 
 
-def poly_to_rotated_box_single(poly):
+def poly_to_rotated_box_single(poly,angle_version):
     """
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     to
@@ -462,7 +466,7 @@ def poly_to_rotated_box_single(poly):
         angle = np.arctan2(
             np.float(pt4[1] - pt1[1]), np.float(pt4[0] - pt1[0]))
 
-    angle = norm_angle(angle)
+    angle = norm_angle(angle,angle_version)
 
     x_ctr = np.float(pt1[0] + pt3[0]) / 2
     y_ctr = np.float(pt1[1] + pt3[1]) / 2
