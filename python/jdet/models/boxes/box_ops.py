@@ -473,7 +473,7 @@ def poly_to_rotated_box_single(poly,angle_version):
     rotated_box = np.array([x_ctr, y_ctr, width, height, angle])
     return rotated_box
 
-def poly_to_rotated_box_np(polys):
+def poly_to_rotated_box_np(polys, angle_version):
     """
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     to
@@ -481,7 +481,7 @@ def poly_to_rotated_box_np(polys):
     """
     rotated_boxes = []
     for poly in polys:
-        rotated_box = poly_to_rotated_box_single(poly)
+        rotated_box = poly_to_rotated_box_single(poly, angle_version)
         rotated_boxes.append(rotated_box)
     return np.array(rotated_boxes).astype(np.float32)
 

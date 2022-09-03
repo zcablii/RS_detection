@@ -30,8 +30,9 @@ class Compose:
 
 @TRANSFORMS.register_module()
 class RandomRotateAug:
-    def __init__(self, random_rotate_on=False):
+    def __init__(self, angle_version = 'le90', random_rotate_on=False):
         self.random_rotate_on = random_rotate_on
+        self.angle_version = angle_version
     
     def _rotate_boxes_90(self,target,size):
         w,h = size
@@ -58,7 +59,7 @@ class RandomRotateAug:
             new_bboxes[:,1::2] = w-bboxes[:,0::2]
 
             if "rboxes" in key:
-                new_bboxes = poly_to_rotated_box_np(new_bboxes)
+                new_bboxes = poly_to_rotated_box_np(new_bboxes, self.angle_version)
 
             target[key]=new_bboxes
 
@@ -314,6 +315,13 @@ class Resize_keep_ratio:
 
 @TRANSFORMS.register_module()
 class RotatedResize(Resize):
+    def __init__(self, min_size, max_size, angle_version='le135', keep_ratio=True):
+        if not isinstance(min_size, (list, tuple)):
+            min_size = (min_size,)
+        self.min_size = min_size
+        self.max_size = max_size
+        self.keep_ratio = keep_ratio
+        self.angle_version = angle_version
 
     def _resize_boxes(self, target,size):
         for key in ["bboxes","hboxes","rboxes","polys","hboxes_ignore","polys_ignore","rboxes_ignore"]:
@@ -337,7 +345,7 @@ class RotatedResize(Resize):
             bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, new_h - 1)
             
             if "rboxes" in key:
-                bboxes = poly_to_rotated_box_np(bboxes)
+                bboxes = poly_to_rotated_box_np(bboxes, self.angle_version)
             target[key]=bboxes
 
 

@@ -38,6 +38,7 @@ def convert_data_to_mmdet(src_path, out_path, trainval=True, filter_empty_gt=Tru
         out_path: output pkl file path
         trainval: trainval or test
     """
+    print('Using angle_version ',angle_version)
     label_ids = {name: i + 1 for i, name in enumerate(get_classes_by_name(type))}
     img_path = os.path.join(src_path, 'images')
     label_path = os.path.join(src_path, 'labelTxt')

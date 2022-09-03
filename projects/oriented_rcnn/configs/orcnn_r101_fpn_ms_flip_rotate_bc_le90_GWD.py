@@ -55,7 +55,7 @@ model = dict(
     ),
     bbox_head=dict(
         type='OrientedHead',
-        num_classes=15,
+        num_classes=10,
         in_channels=256,
         fc_out_channels=1024,
         score_thresh=0.05,
@@ -88,9 +88,9 @@ model = dict(
             type='CrossEntropyLoss',
             ),
         loss_bbox=dict(
-            type='SmoothL1Loss', 
-            beta=1.0, 
-            loss_weight=1.0
+            type='GDLoss', 
+            loss_type='gwd',
+            loss_weight=5.0
             ),
         with_bbox=True,
         with_shared_head=False,
@@ -101,26 +101,29 @@ model = dict(
         end_bbox_type='obb',
         reg_dim=None,
         reg_class_agnostic=True,
-        reg_decoded_bbox=False,
+        reg_decoded_bbox=True,
         pos_weight=-1,
         )
     )
 
+angle_version = 'le90'
 dataset = dict(
     train=dict(
         type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
+        dataset_dir=f'{dataset_root}/preprocessed_ms_le90/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
-                max_size=1024
+                max_size=1024,
+                angle_version = angle_version
             ),
             dict(type='RotatedRandomFlip', prob=0.5),
             dict(
                 type="RandomRotateAug",
                 random_rotate_on=True,
-            ), # this not runned yet
+                angle_version = angle_version
+            ),
             dict(
                 type = "Pad",
                 size_divisor=32),
@@ -138,7 +141,7 @@ dataset = dict(
     ),
     val=dict(
         type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
+        dataset_dir=f'{dataset_root}/preprocessed_ms_le90/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -160,7 +163,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/preprocessed_ms/test_1024_200_0.5-1.0-1.5/images',
+        images_dir=f'{dataset_root}/preprocessed_ms_le90/test_1024_200_0.5-1.0-1.5/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -197,6 +200,6 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 100
+eval_interval = 6
 checkpoint_interval = 1
 log_interval = 50
