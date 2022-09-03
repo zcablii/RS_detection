@@ -16,6 +16,8 @@ def del_tensor_ele(arr,index):
     return jt.concat((arr1,arr2),dim=0)
 
 def del_tensor_eles(arr,indexs):
+    if arr is None:
+        return arr
     indexs.sort(reverse=True)
     for each in indexs:
         arr = del_tensor_ele(arr,each)
@@ -25,14 +27,13 @@ def rm_illegal_targets(scores, bbox_deltas, rois, bbox_targets):
     idx1 = (bbox_targets>1.024e3).nonzero()[:,0]
     idx2 = (bbox_targets<-1.024e3).nonzero()[:,0]
     if not bbox_targets_decode is None:
-        idx3 = (bbox_targets_decode>1.024e3).nonzero()[:,0]
-        idx4 = (bbox_targets_decode<-1.024e3).nonzero()[:,0]
+        idx3 = (bbox_targets_decode>1.024e4).nonzero()[:,0]
+        idx4 = (bbox_targets_decode<-1.024e4).nonzero()[:,0]
+        idx6 = (bbox_targets_decode[:,:4]<0).nonzero()[:,0]
     else:
-        idx3 = []
-        idx4 = []
+        return scores, bbox_deltas, rois, (labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights)
     idx5 = (bbox_targets[:,:4]<0).nonzero()[:,0]
-    idx6 = (bbox_targets_decode[:,:4]<0).nonzero()[:,0]
-    idxs = list(set([ind.item() for ind in jt.concat([idx1, idx2,idx3,idx4,idx5,idx6])]))
+    idxs = list(set([int(ind.item()) for ind in jt.concat([idx1, idx2,idx3,idx4,idx5,idx6])]))
     scores = del_tensor_eles(scores,idxs)
     bbox_deltas = del_tensor_eles(bbox_deltas,idxs)
     rois = del_tensor_eles(rois,idxs)

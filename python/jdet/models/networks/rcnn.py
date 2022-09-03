@@ -30,7 +30,6 @@ class RCNN(nn.Module):
             results: detections
             losses (dict): losses
         '''
-        print(images.shape)
         features = self.backbone(images)
         
         if self.neck:

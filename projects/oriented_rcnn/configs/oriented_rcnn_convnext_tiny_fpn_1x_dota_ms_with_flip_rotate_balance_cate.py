@@ -3,13 +3,12 @@ dataset_root = '/media/data3/lyx/Detection'
 model = dict(
     type='OrientedRCNN',
     backbone=dict(
-        type='Resnet101',
-        frozen_stages=1,
+        type='Convnext_tiny',
         return_stages=["layer1","layer2","layer3","layer4"],
-        pretrained= True),
+        ),
     neck=dict(
         type='FPN',
-        in_channels=[256, 512, 1024, 2048],
+        in_channels=[96, 192, 384, 768],
         out_channels=256,
         num_outs=5),
     rpn = dict(
@@ -187,7 +186,7 @@ optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_
 
 scheduler = dict(
     type='StepLR',
-    warmup='linear',
+    warmup='linear', 
     warmup_iters=500,
     warmup_ratio=0.001,
     milestones=[7, 10])
