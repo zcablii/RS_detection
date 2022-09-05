@@ -180,18 +180,23 @@ class RoITransformer(nn.Module):
         use_target_decode = False
         if hasattr(self.rbbox_head.loss_bbox,'loss_type'):
             use_target_decode = self.rbbox_head.loss_bbox.loss_type in ['gwd','gwd_v0','kld','kld_v0']
+            if self.rbbox_head.loss_bbox.loss_type in ['kfiou']:
+                rbbox_pred_decode = self.obbox_decode(rrois[:, 1:], rbbox_pred) # rbbox_pred 
+                # print('rbbox_pred_decode',rbbox_pred_decode)
+                bbox_targets_decode = self.obbox_decode(rrois[:, 1:], bbox_targets)
+                # print('shapes',rbbox_pred_decode.shape,bbox_targets_decode.shape,rbbox_pred.shape,bbox_targets.shape)
+                # print('rrois.shape, rois.shape',rrois.shape, rois.shape) # 4096,6, 4096,5
         (labels, label_weights, bbox_targets, bbox_weights) = self.rbbox_head.get_target_rbbox( # modifided inside
             sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn[1],use_target_decode)
         # print('bbox_pred.size(0)', bbox_pred.size(0)) #  4096
         # print('rbbox_targets each', 4096) # len 4096 for each
-        rbbox_pred_decode = self.obbox_decode(rrois[:, 1:], rbbox_pred) # rbbox_pred 
-        # print('rbbox_pred_decode',rbbox_pred_decode)
-        bbox_targets_decode = self.obbox_decode(rrois[:, 1:], bbox_targets)
-        # print('shapes',rbbox_pred_decode.shape,bbox_targets_decode.shape,rbbox_pred.shape,bbox_targets.shape)
-        # print('rrois.shape, rois.shape',rrois.shape, rois.shape) # 4096,6, 4096,5
         # a,b,c,d = rbbox_targets
         # print('rbbox_targets',c.shape, c)
-        loss_rbbox = self.rbbox_head.loss(cls_score, rbbox_pred, rbbox_pred_decode,labels, label_weights, bbox_targets, bbox_targets_decode,bbox_weights)
+        if use_target_decode:
+            loss_rbbox = self.rbbox_head.loss(cls_score, rbbox_pred, rbbox_pred_decode,labels, label_weights, bbox_targets, bbox_targets_decode,bbox_weights)
+        else:
+            loss_rbbox = self.rbbox_head.loss(cls_score, rbbox_pred,labels, label_weights, bbox_targets,bbox_weights)
+       
         for name, value in loss_rbbox.items():
             losses['s{}.{}'.format(1, name)] = (value)
         return losses

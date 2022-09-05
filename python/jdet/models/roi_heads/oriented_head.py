@@ -24,14 +24,15 @@ def del_tensor_eles(arr,indexs):
     return arr
 def rm_illegal_targets(scores, bbox_deltas, rois, bbox_targets):
     labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights = bbox_targets
-    idx1 = (bbox_targets>1.024e3).nonzero()[:,0]
-    idx2 = (bbox_targets<-1.024e3).nonzero()[:,0]
-    if not bbox_targets_decode is None:
+    if bbox_targets_decode is None:
+        return scores, bbox_deltas, rois, (labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights)
+
+    else:
         idx3 = (bbox_targets_decode>1.024e4).nonzero()[:,0]
         idx4 = (bbox_targets_decode<-1.024e4).nonzero()[:,0]
         idx6 = (bbox_targets_decode[:,:4]<0).nonzero()[:,0]
-    else:
-        return scores, bbox_deltas, rois, (labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights)
+    idx1 = (bbox_targets>1.024e3).nonzero()[:,0]
+    idx2 = (bbox_targets<-1.024e3).nonzero()[:,0]
     idx5 = (bbox_targets[:,:4]<0).nonzero()[:,0]
     idxs = list(set([int(ind.item()) for ind in jt.concat([idx1, idx2,idx3,idx4,idx5,idx6])]))
     scores = del_tensor_eles(scores,idxs)

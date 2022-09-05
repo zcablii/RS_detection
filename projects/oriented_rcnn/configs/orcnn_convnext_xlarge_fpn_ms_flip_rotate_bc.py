@@ -3,12 +3,14 @@ dataset_root = '/media/data3/lyx/Detection'
 model = dict(
     type='OrientedRCNN',
     backbone=dict(
-        type='Convnext_tiny',
+        type='Convnext_xlarge',
         return_stages=["layer1","layer2","layer3","layer4"],
+        pretrained=True,
+        in_22k=True
         ),
     neck=dict(
         type='FPN',
-        in_channels=[96, 192, 384, 768],
+        in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         num_outs=5),
     rpn = dict(
@@ -130,14 +132,14 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=8,
+        batch_size=2,
         num_workers=8,
         shuffle=True,
         filter_empty_gt=False
     ),
     val=dict(
         type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
+        dataset_dir=f'{dataset_root}/train_val_preprocessed_ms/val_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -153,7 +155,7 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False),
         ],
-        batch_size=8,
+        batch_size=3,
         num_workers=8,
         shuffle=False
     ),
@@ -182,7 +184,7 @@ dataset = dict(
 )
 
 
-optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(type='SGD',  lr=0.0005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
     type='StepLR',
@@ -196,6 +198,6 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 100
+eval_interval = 1
 checkpoint_interval = 1
 log_interval = 50
