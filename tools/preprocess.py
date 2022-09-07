@@ -4,8 +4,9 @@ import os
 import shutil
 from jdet.config import init_cfg, get_cfg
 from jdet.data.devkits.ImgSplit_multi_process import process
-from jdet.data.devkits.convert_data_to_mmdet import convert_data_to_mmdet
-from jdet.data.devkits.fair_to_dota import fair_to_dota
+from jdet.data.devkits.convert_data_to_mmdet import (convert_data_to_mmdet,
+    convert_data_to_mmdet_mapping)
+from jdet.data.devkits.fair_to_dota import fair_to_dota, fair_to_dota_select
 from jdet.utils.general import is_win
 
 from jdet.data.devkits.ssdd_to_dota import ssdd_to_dota
@@ -49,10 +50,30 @@ def run(cfg):
         return
 
     if (cfg.type=='FAIR' or cfg.type=='FAIR1M_1_5'):
-        for task in cfg.convert_tasks:
+        # for task in cfg.convert_tasks:
+        #     print('==============')
+        #     print("convert to dota:", task)
+        #     if hasattr(cfg, 'select_num'):
+        #         fair_to_dota_select(
+        #             os.path.join(cfg.source_fair_dataset_path, task),
+        #             os.path.join(cfg.source_dataset_path, task),
+        #             cfg.select_num)
+        #     else:
+        #         fair_to_dota(
+        #             os.path.join(cfg.source_fair_dataset_path, task),
+        #             os.path.join(cfg.source_dataset_path, task))
+        for task in cfg.tasks:
             print('==============')
-            print("convert to dota:", task)
-            fair_to_dota(os.path.join(cfg.source_fair_dataset_path, task), os.path.join(cfg.source_dataset_path, task))
+            print("convert to dota:", task.label)
+            if hasattr(task, 'fair1m2_aug') and task.fair1m2_aug:
+                fair_to_dota_select(
+                    os.path.join(cfg.source_fair_dataset_path, task.label),
+                    os.path.join(cfg.source_dataset_path, task.label),
+                    os.path.join(cfg.split_path, task.split+'.txt'))
+            else:
+                fair_to_dota(
+                    os.path.join(cfg.source_fair_dataset_path, task.label),
+                    os.path.join(cfg.source_dataset_path, task.label))
 
     for task in cfg.tasks:
         label = task.label
@@ -94,7 +115,14 @@ def run(cfg):
         if (label != "test"):
             print("converting to mmdet format...")
             print(cfg.type)
-            convert_data_to_mmdet(target_path, os.path.join(target_path, 'labels.pkl'), type=cfg.type, angle_version = cfg.angle_version)
+            if hasattr(task, 'fair1m2_aug') and task.fair1m2_aug:
+                convert_data_to_mmdet_mapping(
+                    target_path, os.path.join(target_path, 'labels.pkl'),
+                    type=cfg.type, angle_version = cfg.angle_version)
+            else:
+                convert_data_to_mmdet(
+                    target_path, os.path.join(target_path, 'labels.pkl'),
+                    type=cfg.type, angle_version = cfg.angle_version)
 
 def main():
     parser = argparse.ArgumentParser(description="Jittor DOTA data preprocess")

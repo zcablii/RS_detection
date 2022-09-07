@@ -252,7 +252,7 @@ def voc_eval_dota(dets,gts,iou_func,ovthresh=0.5,use_07_metric=False):
     # go down dets and mark TPs and FPs
     tp = np.zeros(nd)
     fp = np.zeros(nd)
-    for d,det in enumerate(dets):
+    for d, det in enumerate(dets):
         bb = det[1:].astype(float)
         ovmax = -np.inf
         R = gts[int(det[0])]
