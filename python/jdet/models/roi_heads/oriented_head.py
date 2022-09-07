@@ -273,9 +273,9 @@ class OrientedHead(nn.Module):
             rois_list.append(rois)
         rois = jt.concat(rois_list, 0)
         return rois
-    
+
     def get_results(self, multi_bboxes, multi_scores, score_factors=None, bbox_type='hbb'):
-        
+
         bbox_dim = get_bbox_dim(bbox_type)
         num_classes = multi_scores.size(1) - 1
 
@@ -301,7 +301,7 @@ class OrientedHead(nn.Module):
 
         dets = jt.concat([obb2poly(bboxes), scores.unsqueeze(1)], dim=1)
         return dets, labels
-        
+
     def forward_single(self, x, sampling_results, test=False):
 
         if test:
@@ -348,7 +348,7 @@ class OrientedHead(nn.Module):
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
         return cls_score, bbox_pred, rois
-    
+
     def loss(self, cls_score, bbox_pred, rois, labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights, reduction_override=None):
 
         losses = dict()
@@ -458,7 +458,7 @@ class OrientedHead(nn.Module):
         return losses
 
     def get_bboxes_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes, pos_gt_labels, use_delta_and_decode=False):
-        
+
         num_pos = pos_bboxes.size(0)
         num_neg = neg_bboxes.size(0)
         # print('num_pos,num_neg',num_pos,num_neg)
@@ -522,9 +522,9 @@ class OrientedHead(nn.Module):
         #     print('!!!!!exp bbox_targets_decode -get_bboxes_target_single', bbox_targets_decode[idx[0]])
 
         return (labels, label_weights, bbox_targets,bbox_targets_decode, bbox_weights)
-        
-    def get_bboxes_targets(self, sampling_results, concat=True,use_delta_and_decode=False):
-        
+
+    def get_bboxes_targets(self, sampling_results, concat=True, use_delta_and_decode=False):
+
         pos_bboxes_list = [res.pos_bboxes for res in sampling_results]
         neg_bboxes_list = [res.neg_bboxes for res in sampling_results]
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
@@ -581,10 +581,10 @@ class OrientedHead(nn.Module):
         return (labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights)
 
     def get_bboxes(self, rois, cls_score, bbox_pred, img_shape, scale_factor, rescale=False):
-        
+
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
-        
+
         scores = nn.softmax(cls_score, dim=1) if cls_score is not None else None
 
         if bbox_pred is not None:
@@ -692,14 +692,13 @@ class OrientedHead(nn.Module):
             return loss
 
         else:
-            
             result = []
             for i in range(len(targets)):
 
                 scores, bbox_deltas, rois = self.forward_single(x, [proposal_list[i]], test=True)
                 img_shape = targets[i]['img_size']
                 scale_factor = targets[i]['scale_factor']
-                
+
                 det_bboxes, det_labels = self.get_bboxes(rois, scores, bbox_deltas, img_shape, scale_factor, rescale=True)
 
                 poly = det_bboxes[:, :8]
@@ -707,5 +706,5 @@ class OrientedHead(nn.Module):
                 labels = det_labels
 
                 result.append((poly, scores, labels))
-            
+
             return result

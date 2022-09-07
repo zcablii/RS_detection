@@ -45,7 +45,7 @@ class CustomDataset(Dataset):
             self.annotations_file = os.path.abspath(annotations_file)
 
         self.transforms = Compose(transforms)
-        
+
         self.img_infos = jt.load(self.annotations_file)
         if filter_empty_gt:
             self.img_infos = self._filter_imgs(filter_min_size)
