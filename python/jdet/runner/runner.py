@@ -238,7 +238,8 @@ class Runner:
             "optimizer": self.optimizer.parameters()
         }
         save_file = build_file(self.work_dir,prefix=f"checkpoints/ckpt_{self.epoch}.pkl")
-        jt.save(save_data,save_file)
+        if jt.rank ==0:
+            jt.save(save_data,save_file)
         print("saved")
     
     def load(self, load_path, model_only=False):
