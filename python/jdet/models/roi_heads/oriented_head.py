@@ -598,7 +598,7 @@ class OrientedHead(nn.Module):
             cls_score = sum(cls_score) / float(len(cls_score))
 
         # some loss (Seesaw loss..) may have custom activation
-        assert scores.ndim == 2, "Check scores.ndim"
+        assert cls_score.ndim == 2, "Check cls_score.ndim"
         if self.custom_cls_channels:
             scores = self.loss_cls.get_activation(cls_score)
         else:
