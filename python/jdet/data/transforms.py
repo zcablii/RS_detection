@@ -30,7 +30,7 @@ class Compose:
 
 @TRANSFORMS.register_module()
 class RandomRotateAug:
-    def __init__(self, angle_version = 'le90', random_rotate_on=False):
+    def __init__(self, angle_version = 'le135', random_rotate_on=False):
         self.random_rotate_on = random_rotate_on
         self.angle_version = angle_version
     

@@ -70,7 +70,7 @@ class Block(nn.Module):
 
 class ConvNeXt(nn.Module):
 
-    def __init__(self, in_chans=3, num_classes=1000, depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], return_stages=["layer1","layer2","layer3","layer4"], drop_path_rate=0.0, layer_scale_init_value=1e-06, head_init_scale=1.0):
+    def __init__(self, in_chans=3, num_classes=1000, depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], return_stages=["layer1","layer2","layer3","layer4"], drop_path_rate=0.0, layer_scale_init_value=1e-06, norm_eval=True,frozen_stages=-1,head_init_scale=1.0):
         super().__init__()
         self.downsample_layers = nn.ModuleList()
         stem = nn.Sequential(nn.Conv(in_chans, dims[0], 4, stride=4), LayerNorm(dims[0], eps=1e-06, data_format='channels_first'))
@@ -89,6 +89,8 @@ class ConvNeXt(nn.Module):
         self.norm = nn.LayerNorm(dims[(- 1)], eps=1e-06)
         self.head = nn.Linear(dims[(- 1)], num_classes)
         self.apply(self._init_weights)
+        self.norm_eval = norm_eval 
+        self.frozen_stages = frozen_stages
         # self.head.weight.data = self.head.weight.data.multiply(head_init_scale)
         # self.head.bias.data = self.head.bias.data.multiply(head_init_scale)
 
@@ -110,6 +112,30 @@ class ConvNeXt(nn.Module):
         x = self.forward_features(x)
         # x = self.head(x)
         return x
+    
+    def _freeze_stages(self):
+
+        for i in range(1, self.frozen_stages + 1):
+            down_m = self.downsample_layers[i]   
+            down_m.eval()
+            for param in down_m.parameters():
+                param.stop_grad() 
+
+            stage_m = self.stages[i]
+            stage_m.eval()
+            for param in stage_m.parameters():
+                param.stop_grad()  
+
+    def train(self):
+        super(ConvNeXt, self).train()
+        self._freeze_stages()
+        if self.norm_eval:
+            for m in self.modules():
+                # trick: eval have effect on BatchNorm only
+                if isinstance(m, nn.LayerNorm):
+                    m.eval()
+
+
 
 class LayerNorm(nn.Module):
 
@@ -147,8 +173,8 @@ model_urls = {
 @BACKBONES.register_module()
 def Convnext_tiny(pretrained=False, in_22k=False, **kwargs):
     model = ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
-    ckpt_path = '/media/data3/lyx/Detection/pretrained/convnext_ema.pth'
-    model.load_state_dict(jt.load(ckpt_path)['model'])
+    # ckpt_path = '/media/data3/lyx/Detection/pretrained/convnext_ema.pth'
+    # model.load_state_dict(jt.load(ckpt_path)['model'])
     if pretrained:
         url = (model_urls['convnext_tiny_22k'] if in_22k else model_urls['convnext_tiny_1k'])
         checkpoint = jt.load(url)
@@ -187,8 +213,15 @@ def Convnext_large(pretrained=False, in_22k=False, **kwargs):
 def Convnext_xlarge(pretrained=False, in_22k=False, **kwargs):
     model = ConvNeXt(depths=[3, 3, 27, 3], dims=[256, 512, 1024, 2048], **kwargs)
     if pretrained:
-        assert in_22k, 'only ImageNet-22K pre-trained ConvNeXt-XL is available; please set in_22k=True'
-        url = model_urls['convnext_xlarge_22k']
-        checkpoint = jt.load(url)
-        model.load_state_dict(checkpoint['model'])
+        print('loading model convNext xlarge')
+        ckpt_path = '/opt/data/private/LYX/data/pretrained/convnext_xlarge_22k_224.pth'
+        state_dict = jt.load(ckpt_path)['model']
+        # print(state_dict)
+        for k in state_dict.keys():
+            state_dict[k] = state_dict[k]/20
+        model.load_state_dict(state_dict)
+        # assert in_22k, 'only ImageNet-22K pre-trained ConvNeXt-XL is available; please set in_22k=True'
+        # url = model_urls['convnext_xlarge_22k']
+        # checkpoint = jt.load(url)
+        # model.load_state_dict(checkpoint['model'])
     return model

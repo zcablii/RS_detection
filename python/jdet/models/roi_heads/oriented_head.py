@@ -4,7 +4,7 @@ from jittor import nn
 from jdet.data.devkits.result_merge import py_cpu_nms_poly_fast
 from jdet.utils.general import multi_apply
 from jdet.utils.registry import HEADS,BOXES,LOSSES, ROI_EXTRACTORS,build_from_cfg
-
+from jdet.ops.bbox_transforms import choose_best_Rroi_batch
 from jdet.ops.bbox_transforms import *
 from jdet.models.utils.modules import ConvModule
 
@@ -361,7 +361,6 @@ class OrientedHead(nn.Module):
                     label_weights,
                     avg_factor=avg_factor,
                     reduction_override=reduction_override)
-        # print('bbox_pred',bbox_pred)
         if bbox_pred is not None:
 
             bg_class_ind = self.num_classes
@@ -394,39 +393,10 @@ class OrientedHead(nn.Module):
                     pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1, self.reg_dim)[pos_inds.astype(jt.bool), labels[pos_inds.astype(jt.bool)]]
                     if not (bbox_pred_decode is None):    
                         pos_bbox_pred_decode = pos_bbox_pred_decode.view(pos_bbox_pred_decode.size(0), -1, self.reg_dim)[pos_inds.astype(jt.bool), labels[pos_inds.astype(jt.bool)]]
-                # print('len(pos_bbox_pred)',len(pos_bbox_pred))
-                # print('pos_bbox_pred',pos_bbox_pred)
-                # print('[pos_inds.astype(jt.bool)]',len(bbox_targets[pos_inds.astype(jt.bool)]),bbox_targets[pos_inds.astype(jt.bool)])
-                # print('pos_bbox_pred',pos_bbox_pred)
-                # print('bbox_targets[pos_inds.astype(jt.bool)]',bbox_targets[pos_inds.astype(jt.bool)])
-                # print('bbox_weights[pos_inds.astype(jt.bool)]',bbox_weights[pos_inds.astype(jt.bool)])
-                # print('shapes',pos_bbox_pred.shape, bbox_targets[pos_inds.astype(jt.bool)].shape, bbox_weights[pos_inds.astype(jt.bool)].shape)
-                
+               
                 if not (bbox_targets_decode is None):  
                     bbox_targets_decode = bbox_targets_decode[pos_inds.astype(jt.bool)]
                 
-                # print('pos_bbox_pred',pos_bbox_pred)
-                # print('bbox_targets[pos_inds.astype(jt.bool)]',bbox_targets[pos_inds.astype(jt.bool)])
-                # print('pos_bbox_pred_decode',pos_bbox_pred_decode)
-                # print('targets_decode',bbox_targets_decode[pos_inds.astype(jt.bool)])
-                
-                # if (bbox_targets[pos_inds.astype(jt.bool)]>1e5).nonzero().any():
-                #     idx = (bbox_targets[pos_inds.astype(jt.bool)]>1e5).nonzero()[0]
-                #     print('idx',idx)
-                #     print('!!!!exp bbox_targets in loss', bbox_targets[pos_inds.astype(jt.bool)][idx[0]])
-                # if (bbox_targets[pos_inds.astype(jt.bool)]<-1e5).nonzero().any():
-                #     idx = (bbox_targets[pos_inds.astype(jt.bool)]<-1e5).nonzero()[0]
-                #     print('idx',idx)
-                #     print('!!!!exp bbox_targets in -loss', bbox_targets[pos_inds.astype(jt.bool)][idx[0]])
-      
-                # if (bbox_targets_decode>1e5).nonzero().any():
-                #     idx = (bbox_targets_decode>1e5).nonzero()[0]
-                #     print('idx',idx)
-                #     print('!!!!exp bbox_targets_decode in loss', bbox_targets_decode[idx[0]])
-                # if (bbox_targets_decode<-1e5).nonzero().any():
-                #     idx = (bbox_targets_decode<-1e5).nonzero()[0]
-                #     print('idx',idx)
-                #     print('!!!!exp bbox_targets_decode in -loss', bbox_targets_decode[idx[0]])
                 if hasattr(self.loss_bbox,'loss_type'):
                     orcnn_bbox_loss = self.loss_bbox(
                         pos_bbox_pred,
@@ -444,13 +414,7 @@ class OrientedHead(nn.Module):
                         avg_factor=bbox_targets.size(0),
                         reduction_override=reduction_override)
 
-                # print('orcnn_bbox_loss',orcnn_bbox_loss)
-                # print(len(pos_bbox_pred) == len(bbox_targets[pos_inds.astype(jt.bool)]) and len(pos_bbox_pred_decode)==len(bbox_targets_decode[pos_inds.astype(jt.bool)]))
-                # print('pos_bbox_pred',pos_bbox_pred[:3])
-                # print('bbox_targets[pos_inds.astype(jt.bool)]',bbox_targets[pos_inds.astype(jt.bool)][:3])
-                # print('pos_bbox_pred_decode',pos_bbox_pred_decode[:3])
-                # print('targets_decode',bbox_targets_decode[pos_inds.astype(jt.bool)][:3])
-                
+              
                 losses['orcnn_bbox_loss'] = orcnn_bbox_loss
             else:
                 losses['orcnn_bbox_loss'] = bbox_pred.sum() * 0
@@ -461,7 +425,6 @@ class OrientedHead(nn.Module):
 
         num_pos = pos_bboxes.size(0)
         num_neg = neg_bboxes.size(0)
-        # print('num_pos,num_neg',num_pos,num_neg)
         num_samples = num_pos + num_neg
 
         # original implementation uses new_zeros since BG are set to be 0
@@ -496,31 +459,7 @@ class OrientedHead(nn.Module):
 
         if num_neg > 0:
             label_weights[-num_neg:] = 1.0
-        # print('bbox_targets',bbox_targets)
-        # print('bbox_targets_decode',bbox_targets_decode)
       
-        # if (bbox_targets>1.024e3).nonzero().any():
-        #     idx = (bbox_targets>1.024e3).nonzero()[:,0]
-        #     bbox_weights[idx,:] = 0
-        #     print('idx',idx)
-        #     print('!!!!exp bbox_targets get_bboxes_target_single', bbox_targets[idx[0]])
-        # if (bbox_targets<-1.024e3).nonzero().any():
-        #     idx = (bbox_targets<-1.024e3).nonzero()[:,0]
-        #     bbox_weights[idx,:] = 0
-        #     print('idx',idx)
-        #     print('!!!!!exp -bbox_targets -get_bboxes_target_single', bbox_targets[idx[0]])
-
-        # if (bbox_targets_decode>1.024e3).nonzero().any():
-        #     idx = (bbox_targets_decode>1.024e3).nonzero()[:,0]
-        #  #   bbox_weights[idx,:] = 0
-        #     print('idx',idx)
-        #     print('!!!!exp bbox_targets_decode get_bboxes_target_single', bbox_targets_decode[idx[0]])
-        # if (bbox_targets_decode<-1.024e3).nonzero().any():
-        #     idx = (bbox_targets_decode<-1.024e3).nonzero()[:,0]
-        # #    bbox_weights[idx,:] = 0
-        #     print('idx',idx)
-        #     print('!!!!!exp bbox_targets_decode -get_bboxes_target_single', bbox_targets_decode[idx[0]])
-
         return (labels, label_weights, bbox_targets,bbox_targets_decode, bbox_weights)
 
     def get_bboxes_targets(self, sampling_results, concat=True, use_delta_and_decode=False):
@@ -532,9 +471,6 @@ class OrientedHead(nn.Module):
 
         l = len(pos_gt_bboxes_list[0])
         if l > 3: l=3
-        # print('pos_bboxes_list', pos_bboxes_list[0][:l])
-        # print('pos_gt_bboxes_list',pos_gt_bboxes_list[0][:l])
-        # print('pos_gt_labels_list',pos_gt_labels_list)
         outputs = multi_apply(
             self.get_bboxes_target_single,
             pos_bboxes_list,
@@ -554,30 +490,7 @@ class OrientedHead(nn.Module):
                 bbox_targets_decode = jt.concat(bbox_targets_decode, 0)
             else:
                 bbox_targets_decode = None
-        # print('labels',len(labels),labels)
-        # print('label_weights',len(label_weights),label_weights)
-        # print('bbox_targets',len(bbox_targets),bbox_targets)
-        # print('bbox_weights',len(bbox_weights),bbox_weights)
         
-      
-        # if (bbox_targets>1e5).nonzero().any():
-        #     idx = (bbox_targets>1e5).nonzero()[0]
-        #     print('idx',idx)
-        #     print('!!!!exp bbox_targets get_bboxes_targets', bbox_targets[idx[0]])
-        # if (bbox_targets<-1e5).nonzero().any():
-        #     idx = (bbox_targets<-1e5).nonzero()[0]
-        #     print('idx',idx)
-        #     print('!!!!!exp bbox_targets -get_bboxes_targets', bbox_targets[idx[0]])
-      
-        # if (bbox_targets_decode>1e5).nonzero().any():
-        #     idx = (bbox_targets_decode>1e5).nonzero()[0]
-        #     print('idx',idx)
-        #     print('!!!!exp bbox_targets_decode get_bboxes_targets', bbox_targets_decode[idx[0]])
-        # if (bbox_targets_decode<-1e5).nonzero().any():
-        #     idx = (bbox_targets_decode<-1e5).nonzero()[0]
-        #     print('idx',idx)
-        #     print('!!!!!exp bbox_targets_decode -get_bboxes_targets', bbox_targets_decode[idx[0]])
-
         return (labels, label_weights, bbox_targets, bbox_targets_decode, bbox_weights)
 
     def get_bboxes(self, rois, cls_score, bbox_pred, img_shape, scale_factor, rescale=False):
@@ -622,7 +535,6 @@ class OrientedHead(nn.Module):
             gt_labels = []
             gt_bboxes_ignore = []
             gt_obboxes_ignore = []
-
             for target in targets:
                 if target["rboxes"] is None:
                     obb = None
@@ -655,7 +567,6 @@ class OrientedHead(nn.Module):
                 sampling_results = []
 
                 for i in range(num_imgs):
-                    
                     assign_result = self.assigner.assign(proposal_list[i], target_bboxes[i], target_bboxes_ignore[i], gt_labels[i])
 
                     sampling_result = self.sampler.sample(
@@ -675,18 +586,12 @@ class OrientedHead(nn.Module):
                     
 
             scores, bbox_deltas, rois = self.forward_single(x, sampling_results, test=False)
-            # print('scores', scores[0]) # len 4096, num_classes + 1
-            # print('bbox_deltas', bbox_deltas[0])# len 4096,5, 5param deltas
-            # print('rois', rois[0])# len 4096,6
+
             use_delta_and_decode = False
             if hasattr(self.loss_bbox,'loss_type'):
                 if self.loss_bbox.loss_type in self.use_delta_and_encode_loss:
                     use_delta_and_decode=True
             bbox_targets = self.get_bboxes_targets(sampling_results,use_delta_and_decode = use_delta_and_decode)
-            scores, bbox_deltas, rois,bbox_targets = rm_illegal_targets(scores, bbox_deltas, rois,bbox_targets)
-
-            # print('shapes', scores.shape, bbox_deltas.shape, rois.shape, labels.shape, label_weights.shape, bbox_targets.shape, bbox_targets_decode.shape, bbox_weights.shape)
-            # print('bbox_targets'), bbox_targets)# labels, label_weights, bbox_targets, bbox_weights each len 4096
             loss = self.loss(scores, bbox_deltas, rois, *bbox_targets)
 
             return loss

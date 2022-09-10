@@ -82,11 +82,11 @@ class Runner:
         
         while not self.finish:
             self.train()
+            if check_interval(self.epoch,self.checkpoint_interval):
+                self.save()
             if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 self.val()
-            if check_interval(self.epoch,self.checkpoint_interval):
-                self.save()
         self.test()
 
     def test_time(self):

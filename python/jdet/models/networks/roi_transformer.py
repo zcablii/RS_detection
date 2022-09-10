@@ -97,7 +97,9 @@ class RoITransformer(nn.Module):
             gt_obbs.append(target['rboxes'])
 
         losses = dict()
+        
         features = self.backbone(images)
+        # print('features',features[0][0][0][0])
         if(self.neck):
             features = self.neck(features)
         rpn_outs = self.rpn_head(features)
@@ -177,25 +179,32 @@ class RoITransformer(nn.Module):
         # print('len(rbbox_feats)',len(rbbox_feats),rbbox_feats) # 4096
         # print('rbbox_feats',rbbox_feats)
         cls_score, rbbox_pred = self.rbbox_head(rbbox_feats)
-        use_target_decode = False
+        use_encode_decode = False
+        reg_decode_bbox = False
         if hasattr(self.rbbox_head.loss_bbox,'loss_type'):
-            use_target_decode = self.rbbox_head.loss_bbox.loss_type in ['gwd','gwd_v0','kld','kld_v0']
+            reg_decode_bbox = self.rbbox_head.loss_bbox.loss_type in ['gwd','gwd_v0','kld','kld_v0']
             if self.rbbox_head.loss_bbox.loss_type in ['kfiou']:
+                use_encode_decode = True
                 rbbox_pred_decode = self.obbox_decode(rrois[:, 1:], rbbox_pred) # rbbox_pred 
+                # bbox_targets_decode = bbox_targets
                 # print('rbbox_pred_decode',rbbox_pred_decode)
-                bbox_targets_decode = self.obbox_decode(rrois[:, 1:], bbox_targets)
                 # print('shapes',rbbox_pred_decode.shape,bbox_targets_decode.shape,rbbox_pred.shape,bbox_targets.shape)
                 # print('rrois.shape, rois.shape',rrois.shape, rois.shape) # 4096,6, 4096,5
+            else:
+                if reg_decode_bbox:
+                    rbbox_pred = self.obbox_decode(rrois[:, 1:], rbbox_pred)
+                rbbox_pred_decode = None
+                bbox_targets_decode = None
         (labels, label_weights, bbox_targets, bbox_weights) = self.rbbox_head.get_target_rbbox( # modifided inside
-            sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn[1],use_target_decode)
+            sampling_results, gt_obbs, gt_labels, self.train_cfg.rcnn[1],reg_decode_bbox)
         # print('bbox_pred.size(0)', bbox_pred.size(0)) #  4096
         # print('rbbox_targets each', 4096) # len 4096 for each
         # a,b,c,d = rbbox_targets
         # print('rbbox_targets',c.shape, c)
-        if use_target_decode:
+        if use_encode_decode:
             loss_rbbox = self.rbbox_head.loss(cls_score, rbbox_pred, rbbox_pred_decode,labels, label_weights, bbox_targets, bbox_targets_decode,bbox_weights)
         else:
-            loss_rbbox = self.rbbox_head.loss(cls_score, rbbox_pred,labels, label_weights, bbox_targets,bbox_weights)
+            loss_rbbox = self.rbbox_head.loss(cls_score, rbbox_pred, labels, label_weights, bbox_targets,bbox_weights)
        
         for name, value in loss_rbbox.items():
             losses['s{}.{}'.format(1, name)] = (value)
