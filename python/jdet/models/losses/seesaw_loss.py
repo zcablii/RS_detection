@@ -3,6 +3,7 @@ import jittor as jt
 from jittor import init
 from jittor import nn
 from jdet.models.losses import weighted_cross_entropy
+from jdet.utils.registry import LOSSES
 
 def one_hot(index, num_classes):
     ret = jt.zeros((index.shape[0], num_classes))
@@ -78,6 +79,7 @@ def seesaw_ce_loss(cls_score,
     return loss
 
 
+@LOSSES.register_module()
 class SeesawLoss(nn.Module):
     """
     Seesaw Loss for Long-Tailed Instance Segmentation (CVPR 2021)

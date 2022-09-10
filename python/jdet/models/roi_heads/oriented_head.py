@@ -138,12 +138,6 @@ class OrientedHead(nn.Module):
             self.avg_pool = nn.AvgPool2d(self.roi_feat_size)
         else:
             in_channels *= self.roi_feat_area
-            
-        if self.with_cls:
-            self.fc_cls = nn.Linear(in_channels, num_classes + 1)
-        if self.with_reg:
-            out_dim_reg = self.reg_dim if reg_class_agnostic else self.reg_dim * num_classes
-            self.fc_reg = nn.Linear(in_channels, out_dim_reg)
 
         assert (num_shared_convs + num_shared_fcs + num_cls_convs +
                 num_cls_fcs + num_reg_convs + num_reg_fcs > 0)
@@ -169,9 +163,23 @@ class OrientedHead(nn.Module):
         self.assigner = build_from_cfg(assigner, BOXES)
         self.sampler = build_from_cfg(sampler, BOXES)
         self.bbox_roi_extractor = build_from_cfg(bbox_roi_extractor, ROI_EXTRACTORS)
-        
+
+        if self.with_cls:
+            if self.custom_cls_channels:
+                cls_channels = self.loss_cls.get_cls_channels(self.num_classes)
+            else:
+                cls_channels = self.num_classes + 1
+            self.fc_cls = nn.Linear(in_channels, cls_channels)
+        if self.with_reg:
+            out_dim_reg = self.reg_dim if reg_class_agnostic else self.reg_dim * num_classes
+            self.fc_reg = nn.Linear(in_channels, out_dim_reg)
+
         self._init_layers()
         self.init_weights()
+
+    @property
+    def custom_cls_channels(self):
+        return getattr(self.loss_cls, 'custom_cls_channels', False)
 
     def _add_conv_fc_branch(self, num_branch_convs,  num_branch_fcs, in_channels, is_shared=False):
         """Add shared or separable branch
@@ -237,7 +245,11 @@ class OrientedHead(nn.Module):
 
         # reconstruct fc_cls and fc_reg since input channels are changed
         if self.with_cls:
-            self.fc_cls = nn.Linear(self.cls_last_dim, self.num_classes + 1)
+            if self.custom_cls_channels:
+                cls_channels = self.loss_cls.get_cls_channels(self.num_classes)
+            else:
+                cls_channels = self.num_classes + 1
+            self.fc_cls = nn.Linear(self.cls_last_dim, cls_channels)
         if self.with_reg:
             out_dim_reg = self.reg_dim if self.reg_class_agnostic else \
                     self.reg_dim * self.num_classes
@@ -498,7 +510,13 @@ class OrientedHead(nn.Module):
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
 
-        scores = nn.softmax(cls_score, dim=1) if cls_score is not None else None
+        # some loss (Seesaw loss..) may have custom activation
+        assert scores.ndim == 2, "Check scores.ndim"
+        if self.custom_cls_channels:
+            scores = self.loss_cls.get_activation(cls_score)
+        else:
+            scores = nn.softmax( cls_score, dim=-1) if cls_score is not None else None
+            # scores = nn.softmax(cls_score, dim=1) if cls_score is not None else None
 
         if bbox_pred is not None:
             bboxes = self.bbox_coder.decode(rois[:, 1:], bbox_pred, max_shape=img_shape)
