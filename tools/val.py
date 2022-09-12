@@ -129,7 +129,16 @@ def evaluate(submit_csvfile_path, read_from_xml = False):
     aps["meanAP"]=map
     return aps
 
-
+def evaluate_in_training(csvfile_path, iter, logger):
+    assert os.path.exists(csvfile_path), "file {} not exits.".format(csvfile_path)
+    temp = evaluate(csvfile_path)
+    print("")
+    result = {}
+    result["Validation Score"] = "{:.6f}".format(float(temp["meanAP"])) 
+    result.update(temp)
+    result["iter"] = iter
+    logger.log(result)
+    
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
