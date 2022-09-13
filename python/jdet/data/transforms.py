@@ -52,7 +52,7 @@ class RandomRotateAug:
                 continue
 
             if "rboxes" in key:
-                bboxes  = rotated_box_to_poly_np(bboxes)
+                bboxes  = rotated_box_to_poly_np(bboxes, self.angle_version)
 
             new_bboxes = np.zeros_like(bboxes)
             new_bboxes[:,0::2] = bboxes[:,1::2]
@@ -332,7 +332,7 @@ class RotatedResize(Resize):
                 continue
             
             if "rboxes" in key:
-                bboxes = rotated_box_to_poly_np(bboxes)
+                bboxes = rotated_box_to_poly_np(bboxes, self.angle_version)
 
             width,height = target["img_size"]
             new_w,new_h = size

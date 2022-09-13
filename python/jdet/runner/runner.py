@@ -18,6 +18,7 @@ from tqdm import tqdm
 from jittor_utils import auto_diff
 import copy
 
+
 class Runner:
     def __init__(self):
         cfg = get_cfg()
@@ -53,13 +54,6 @@ class Runner:
         self.iter = 0
         self.epoch = 0
 
-        if self.max_epoch:
-            if (self.train_dataset):
-                self.total_iter = self.max_epoch * len(self.train_dataset)
-            else:
-                self.total_iter = 0
-        else:
-            self.total_iter = self.max_iter
 
         if (cfg.pretrained_weights):
             self.load(cfg.pretrained_weights, model_only=True)
@@ -69,6 +63,14 @@ class Runner:
         if check_file(self.resume_path):
             self.resume()
 
+        self.max_epoch = cfg.max_epoch 
+        if self.max_epoch:
+            if (self.train_dataset):
+                self.total_iter = self.max_epoch * len(self.train_dataset)
+            else:
+                self.total_iter = 0
+        else:
+            self.total_iter = self.max_iter
 
     @property
     def finish(self):
@@ -86,7 +88,8 @@ class Runner:
                 self.save()
             if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
-                self.val()
+                # self.val()
+                self.test()
         self.test()
 
     def test_time(self):
@@ -220,6 +223,10 @@ class Runner:
             if (self.cfg.dataset.test.type == "ImageDataset"):
                 dataset_type = self.test_dataset.dataset_type
                 data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name,dataset_type,self.cfg.dataset.test.images_dir)
+                import sys
+                sys.path.append(os.path.join(os.getcwd(), "tools"))
+                from val import evaluate_in_training
+                evaluate_in_training(os.path.join(os.getcwd(),"submit_zips", self.work_dir.split(os.path.sep)[-1]+".csv"), self.iter, self.logger)
 
     @jt.single_process_scope()
     def save(self):

@@ -569,7 +569,15 @@ def rotated_box_to_poly_single(rrect):
     poly = get_best_begin_point_single(poly)
     return poly
 
-def rotated_box_to_poly_np(rrects):
+
+def rotated_box_to_poly_np(obboxes,angle_version='le90'):
+    if angle_version=='le135':
+        return rotated_box_to_poly_np_le135(obboxes)
+    else:
+        return rotated_box_to_poly_np_le90(obboxes)
+
+
+def rotated_box_to_poly_np_le135(rrects):
     """
     rrect:[x_ctr,y_ctr,w,h,angle]
     to
@@ -592,7 +600,36 @@ def rotated_box_to_poly_np(rrects):
     polys = np.array(polys)
     polys = get_best_begin_point(polys)
     return polys.astype(np.float32)
-    
+
+
+def rotated_box_to_poly_np_le90(obboxes):
+    """Convert oriented bounding boxes to polygons.
+
+    Args:
+        obbs (ndarray): [x_ctr,y_ctr,w,h,angle,score]
+
+    Returns:
+        polys (ndarray): [x0,y0,x1,y1,x2,y2,x3,y3,score]
+    """
+    try:
+        center, w, h, theta, score = np.split(obboxes, (2, 3, 4, 5), axis=-1)
+    except:  # noqa: E722
+        results = np.stack([0., 0., 0., 0., 0., 0., 0., 0., 0.], axis=-1)
+        return results.reshape(1, -1).astype(np.float32)
+    Cos, Sin = np.cos(theta), np.sin(theta)
+    vector1 = np.concatenate([w / 2 * Cos, w / 2 * Sin], axis=-1)
+    vector2 = np.concatenate([-h / 2 * Sin, h / 2 * Cos], axis=-1)
+    point1 = center - vector1 - vector2
+    point2 = center + vector1 - vector2
+    point3 = center + vector1 + vector2
+    point4 = center - vector1 + vector2
+    polys = np.concatenate([point1, point2, point3, point4, score], axis=-1)
+    polys = get_best_begin_point(polys)
+    return polys.astype(np.float32)
+
+
+
+
 def rotated_box_to_poly(rrects):
     """
     rrect:[x_ctr,y_ctr,w,h,angle]
