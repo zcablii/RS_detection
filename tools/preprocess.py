@@ -49,31 +49,31 @@ def run(cfg):
             convert_data_to_mmdet(out_path, os.path.join(out_path, 'labels.pkl'), type=cfg.type, angle_version = cfg.angle_version)
         return
 
-    # if (cfg.type=='FAIR' or cfg.type=='FAIR1M_1_5'):
-    #     # for task in cfg.convert_tasks:
-    #     #     print('==============')
-    #     #     print("convert to dota:", task)
-    #     #     if hasattr(cfg, 'select_num'):
-    #     #         fair_to_dota_select(
-    #     #             os.path.join(cfg.source_fair_dataset_path, task),
-    #     #             os.path.join(cfg.source_dataset_path, task),
-    #     #             cfg.select_num)
-    #     #     else:
-    #     #         fair_to_dota(
-    #     #             os.path.join(cfg.source_fair_dataset_path, task),
-    #     #             os.path.join(cfg.source_dataset_path, task))
-    #     for task in cfg.tasks:
-    #         print('==============')
-    #         print("convert to dota:", task.label)
-    #         if hasattr(task, 'fair1m2_aug') and task.fair1m2_aug:
-    #             fair_to_dota_select(
-    #                 os.path.join(cfg.source_fair_dataset_path, task.label),
-    #                 os.path.join(cfg.source_dataset_path, task.label),
-    #                 os.path.join(cfg.split_path, task.split+'.txt'))
-    #         else:
-    #             fair_to_dota(
-    #                 os.path.join(cfg.source_fair_dataset_path, task.label),
-    #                 os.path.join(cfg.source_dataset_path, task.label))
+    if (cfg.type=='FAIR' or cfg.type=='FAIR1M_1_5'):
+        # for task in cfg.convert_tasks:
+        #     print('==============')
+        #     print("convert to dota:", task)
+        #     if hasattr(cfg, 'select_num'):
+        #         fair_to_dota_select(
+        #             os.path.join(cfg.source_fair_dataset_path, task),
+        #             os.path.join(cfg.source_dataset_path, task),
+        #             cfg.select_num)
+        #     else:
+        #         fair_to_dota(
+        #             os.path.join(cfg.source_fair_dataset_path, task),
+        #             os.path.join(cfg.source_dataset_path, task))
+        for task in cfg.tasks:
+            print('==============')
+            print("convert to dota:", task.label)
+            if hasattr(task, 'fair1m2_aug') and task.fair1m2_aug:
+                fair_to_dota_select(
+                    os.path.join(cfg.source_fair_dataset_path, task.label),
+                    os.path.join(cfg.source_dataset_path, task.label),
+                    os.path.join(cfg.split_path, task.split+'.txt'))
+            else:
+                fair_to_dota(
+                    os.path.join(cfg.source_fair_dataset_path, task.label),
+                    os.path.join(cfg.source_dataset_path, task.label))
 
     for task in cfg.tasks:
         label = task.label
