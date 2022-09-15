@@ -3,7 +3,7 @@ python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preproces
 """
 
 type='FAIR1M_1_5'
-source_fair_dataset_path='/yimian/dataset'
+source_fair_dataset_path='/yimian/jdet'
 source_dataset_path='/yimian/dota_ms'
 target_dataset_path='/yimian/preprocessed_ms_le90'
 convert_tasks=['train','test']
