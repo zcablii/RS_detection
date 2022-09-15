@@ -10,4 +10,6 @@ from . import gliding_head
 from . import ssd_head
 from . import fasterrcnn_head
 from . import fcos_head
+from .oriented_eqlv2_head import OrientedEQLv2Head
+
 __all__ = []
