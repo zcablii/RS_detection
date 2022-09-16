@@ -1,4 +1,4 @@
-dataset_root = '/media/data3/lyx/Detection'
+dataset_root = '/opt/data/private/LYX/data'
 # model settings
 model = dict(
     type='OrientedRCNN',
@@ -110,7 +110,7 @@ angle_version = 'le90'
 dataset = dict(
     train=dict(
         type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/preprocessed_ms_le90/train_1024_200_0.5-1.0-1.5',
+        dataset_dir=f'{dataset_root}/FAIR1M2.0_preprocessed_ms/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -134,19 +134,20 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=8,
+        batch_size=16,
         num_workers=8,
         shuffle=True,
         filter_empty_gt=False
     ),
     val=dict(
         type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/preprocessed_ms_le90/train_1024_200_0.5-1.0-1.5',
+        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
-                max_size=1024
+                max_size=1024,
+                angle_version = angle_version
             ),
             dict(
                 type = "Pad",
@@ -157,18 +158,19 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False),
         ],
-        batch_size=8,
+        batch_size=16,
         num_workers=8,
         shuffle=False
     ),
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/preprocessed_ms_le90/test_1024_200_0.5-1.0-1.5/images',
+        images_dir=f'{dataset_root}/preprocessed_ms/test_1024_200_0.5-1.0-1.5/images',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
-                max_size=1024
+                max_size=1024,
+                angle_version = angle_version
             ),
             dict(
                 type = "Pad",
@@ -200,6 +202,7 @@ logger = dict(
 
 # when we the trained model from cshuan, image is rgb
 max_epoch = 12
-eval_interval = 100
+eval_interval = 3
 checkpoint_interval = 1
 log_interval = 50
+# flip_test = ['H','V','HV']

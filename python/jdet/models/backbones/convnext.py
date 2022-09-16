@@ -204,9 +204,12 @@ def Convnext_base(pretrained=False, in_22k=False, **kwargs):
 def Convnext_large(pretrained=False, in_22k=False, **kwargs):
     model = ConvNeXt(depths=[3, 3, 27, 3], dims=[192, 384, 768, 1536], **kwargs)
     if pretrained:
-        url = (model_urls['convnext_large_22k'] if in_22k else model_urls['convnext_large_1k'])
-        checkpoint = jt.load(url)
-        model.load_state_dict(checkpoint['model'])
+        print('loading model convNext xlarge')
+        ckpt_path = '/opt/data/private/LYX/data/pretrained/convnext_large_1k_384.pth'
+        state_dict = jt.load(ckpt_path)['model']
+ 
+        model.load_state_dict(state_dict)
+       
     return model
 
 @BACKBONES.register_module()
@@ -214,11 +217,11 @@ def Convnext_xlarge(pretrained=False, in_22k=False, **kwargs):
     model = ConvNeXt(depths=[3, 3, 27, 3], dims=[256, 512, 1024, 2048], **kwargs)
     if pretrained:
         print('loading model convNext xlarge')
-        ckpt_path = '/opt/data/private/LYX/data/pretrained/convnext_xlarge_22k_224.pth'
+        ckpt_path = '/opt/data/private/LYX/data/pretrained/convnext_xlarge_22k_1k_384_ema.pth'
         state_dict = jt.load(ckpt_path)['model']
         # print(state_dict)
-        for k in state_dict.keys():
-            state_dict[k] = state_dict[k]/20
+        # for k in state_dict.keys():
+        #     state_dict[k] = state_dict[k]/20
         model.load_state_dict(state_dict)
         # assert in_22k, 'only ImageNet-22K pre-trained ConvNeXt-XL is available; please set in_22k=True'
         # url = model_urls['convnext_xlarge_22k']

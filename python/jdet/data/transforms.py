@@ -9,6 +9,8 @@ from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box
 from jdet.models.boxes.iou_calculator import bbox_overlaps_np
 from numpy import random as nprandom
 
+import mmcv
+
 @TRANSFORMS.register_module()
 class Compose:
     def __init__(self, transforms=None):
@@ -76,6 +78,156 @@ class RandomRotateAug:
                 target["rotate_angle"]=90*indx
 
         return image, target
+
+
+@TRANSFORMS.register_module()
+class PolyRandomRotate(object):
+
+    def __init__(self,
+                 rotate_ratio=0.5,
+                 mode='range',
+                 angles_range=180,
+                 auto_bound=False,
+                 angle_version='le90'):
+        self.rotate_ratio = rotate_ratio
+        self.auto_bound = auto_bound
+        assert mode in ['range', 'value'], \
+            f"mode is supposed to be 'range' or 'value', but got {mode}."
+        if mode == 'range':
+            assert isinstance(angles_range, int), \
+                "mode 'range' expects angle_range to be an int."
+        else:
+            assert mmcv.is_seq_of(angles_range, int) and len(angles_range), \
+                "mode 'value' expects angle_range as a non-empty list of int."
+        self.mode = mode
+        self.angles_range = angles_range
+        self.discrete_range = [90, 180, -90, -180]
+        self.version = angle_version
+
+    @property
+    def is_rotate(self):
+        """Randomly decide whether to rotate."""
+        return np.random.rand() < self.rotate_ratio
+
+    def apply_image(self, img, bound_h, bound_w, interp=cv2.INTER_LINEAR):
+        """
+        img should be a numpy array, formatted as Height * Width * Nchannels
+        """
+        if len(img) == 0:
+            return img
+        return cv2.warpAffine(
+            img, self.rm_image, (bound_w, bound_h), flags=interp)
+
+    def apply_coords(self, coords):
+        """
+        coords should be a N * 2 array-like, containing N couples of (x, y)
+        points
+        """
+        if len(coords) == 0:
+            return coords
+        coords = np.asarray(coords, dtype=float)
+        return cv2.transform(coords[:, np.newaxis, :], self.rm_coords)[:, 0, :]
+
+    def create_rotation_matrix(self,
+                               center,
+                               angle,
+                               bound_h,
+                               bound_w,
+                               offset=0):
+        """Create rotation matrix."""
+        center += offset
+        rm = cv2.getRotationMatrix2D(tuple(center), angle, 1)
+        if self.auto_bound:
+            rot_im_center = cv2.transform(center[None, None, :] + offset,
+                                          rm)[0, 0, :]
+            new_center = np.array([bound_w / 2, bound_h / 2
+                                   ]) + offset - rot_im_center
+            rm[:, 2] += new_center
+        return rm
+
+    def filter_border(self, bboxes, h, w):
+        """Filter the box whose center point is outside or whose side length is
+        less than 5."""
+       
+        x_ctr, y_ctr = bboxes[:, 0], bboxes[:, 1]
+        w_bbox, h_bbox = bboxes[:, 2], bboxes[:, 3]
+        keep_inds = (x_ctr > 0) & (x_ctr < w) & (y_ctr > 0) & (y_ctr < h) & \
+                    (w_bbox > 5) & (h_bbox > 5)
+        return keep_inds
+
+    def __call__(self, image, target=None ):
+        """Call function of PolyRandomRotate."""
+        o_img = image.copy()
+        o_target = target.copy()
+        h, w = image.size
+        image = np.array(image, dtype=np.uint8)
+        if not self.is_rotate:
+            angle = 0
+        else:
+            if self.mode == 'range':
+                angle = self.angles_range * (2 * np.random.rand() - 1)
+            else:
+                i = np.random.randint(len(self.angles_range))
+                angle = self.angles_range[i]
+
+        target['rotate_angle'] = angle
+
+        image_center = np.array((w / 2, h / 2))
+        abs_cos, abs_sin = \
+            abs(np.cos(angle / 180 * np.pi)), abs(np.sin(angle / 180 * np.pi))
+        if self.auto_bound:
+            bound_w, bound_h = np.rint(
+                [h * abs_sin + w * abs_cos,
+                 h * abs_cos + w * abs_sin]).astype(int)
+        else:
+            bound_w, bound_h = w, h
+
+        self.rm_coords = self.create_rotation_matrix(image_center, angle,
+                                                     bound_h, bound_w)
+        self.rm_image = self.create_rotation_matrix(
+            image_center, angle, bound_h, bound_w, offset=-0.5)
+
+        image = self.apply_image(image, bound_h, bound_w)
+        target['img_size'] = (bound_h, bound_w)
+        gt_bboxes = target.get('rboxes', [])
+        labels = target.get('labels', [])
+        polys = rotated_box_to_poly_np(gt_bboxes).reshape(-1, 2)
+        polys = self.apply_coords(polys).reshape(-1, 8)
+        gt_bboxes = poly_to_rotated_box_np(polys,self.version) \
+                
+        gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
+        keep_inds = self.filter_border(gt_bboxes, bound_h, bound_w)
+        gt_bboxes = gt_bboxes[keep_inds, :]
+        polys = polys[keep_inds]
+        max_xy = polys.reshape(-1,4,2).max(axis=1)
+        min_xy = polys.reshape(-1,4,2).min(axis=1)
+        # print(polys,max_xy, min_xy)
+        res_hbox = []
+        for each in zip(max_xy, min_xy):
+            x,y = (each[0]+each[1])/2
+            h,w = each[0]-each[1]
+            res_hbox.append([x,y,h,w])
+     
+        hbox = np.array(res_hbox).astype(np.float32)
+        
+        labels = labels[keep_inds]
+        
+        target['rboxes'] = gt_bboxes
+        target['labels'] = labels
+        target['polys'] = polys
+        target['hboxes'] = hbox
+        # print("Image.fromarray(image) , target",Image.fromarray(image) , target)
+        if len(labels) == 0:
+            return o_img, o_target
+        return Image.fromarray(image) , target
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(rotate_ratio={self.rotate_ratio}, ' \
+                    f'angles_range={self.angles_range}, ' \
+                    f'auto_bound={self.auto_bound})'
+        return repr_str
+
 
 @TRANSFORMS.register_module()
 class Resize:
