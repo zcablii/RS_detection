@@ -86,6 +86,17 @@ def read_xml_to_numpy(xml_list):
         gts.append(det)
     return np.concatenate(gts)
 
+def evaluate_pre_a(submit_csvfile_path):
+    print("Calculating Pre-a dataseet mAP......")
+    dets = read_csv_to_numpy(submit_csvfile_path)
+    gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "gts.npy") 
+    assert os.path.exists(gts_file_path),  "file {} not exits".format(gts_file_path)
+    gts = np.load(gts_file_path)
+    result = evaluate_new(gts, dets)
+    print("\nValidation Score:", result["meanAP"])
+    result.pop("meanAP")
+    for k, v in result.items():
+        print("{:.5f}".format(v), "({})".format(k))
 
 def evaluate(submit_csvfile_path, read_from_xml = False, new_testdata = True):
     xml_list = glob.glob("val/*.xml")
@@ -95,7 +106,7 @@ def evaluate(submit_csvfile_path, read_from_xml = False, new_testdata = True):
     if read_from_xml:
         gts = read_xml_to_numpy(xml_list)
     else:
-        gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "gts.npy") 
+        gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "new_gts.npy") 
         assert os.path.exists(gts_file_path),  "file {} not exits".format(gts_file_path)
         gts = np.load(gts_file_path)
     
@@ -105,20 +116,32 @@ def evaluate(submit_csvfile_path, read_from_xml = False, new_testdata = True):
         
         judge_matrix = np.loadtxt(idx_file_path, delimiter=",")
         avaiable_idx_list = judge_matrix[judge_matrix[:,2]==1][:,0]
-        gts = extra_bool(avaiable_idx_list, gts)
-        dets = extra_bool(avaiable_idx_list, dets)
-    
-    return evaluate_new(gts, dets)
+        gray_idx_list = judge_matrix[judge_matrix[:,1]==1][:,0]
+        color_idx_list = judge_matrix[(judge_matrix[:,1]==0) & (judge_matrix[:,2]==1)][:,0]
+        
+        avaiable_gts = extra_bool(avaiable_idx_list, gts)
+        avaiable_dets = extra_bool(avaiable_idx_list, dets)
+        gray_gts = extra_bool(gray_idx_list, gts)
+        gray_dets = extra_bool(gray_idx_list, dets)
+        color_gts = extra_bool(color_idx_list, gts)
+        color_dets = extra_bool(color_idx_list, dets)
+
+        avaiable_result = evaluate_new(avaiable_gts, avaiable_dets)
+        gray_result = evaluate_new(gray_gts, gray_dets)
+        color_result = evaluate_new(color_gts, color_dets)
+    return [avaiable_result, color_result, gray_result]
 
 def evaluate_in_training(csvfile_path, iter, logger):
     assert os.path.exists(csvfile_path), "file {} not exits.".format(csvfile_path)
-    temp = evaluate(csvfile_path)
+    avaiable_result, color_result, gray_result = evaluate(csvfile_path)
     print("")
-    result = {}
-    result["Validation Score"] = "{:.6f}".format(float(temp["meanAP"])) 
-    result.update(temp)
-    result["iter"] = iter
-    logger.log(result)
+    show_str = ["total", "color", "gray"]
+    for i, each in enumerate([avaiable_result, color_result, gray_result]):
+        result = {}
+        result["({})Validation Score".format(show_str[i])] = "{:.6f}".format(float(each["meanAP"])) 
+        result.update(each)
+        result["iter"] = iter
+        logger.log(result)
 
 def evaluate_new(gts, dets):
     if len(dets) == 0:
@@ -147,8 +170,12 @@ def evaluate_new(gts, dets):
             g = np.concatenate([g,dg])
             classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
         rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly)
-        aps[classname + "_AP"]=ap 
-    map = sum(list(aps.values()))/len(aps)
+        aps[classname + "_AP"]=ap
+    class_ap_list = []
+    for ap in aps.values():
+        if ap != 0:
+            class_ap_list.append(ap)
+    map = sum(class_ap_list)/len(class_ap_list)
     aps["meanAP"]=map
     return aps
 
@@ -230,9 +257,18 @@ def main():
         default="/opt/data/private/new_val_func/8205.csv",
         type=str,
     )
+    parser.add_argument(
+        "--pre_test",
+        default=False,
+        type=bool
+    )
     args = parser.parse_args()
     assert os.path.exists(args.csvfile_path), "file {} not exits.".format(args.csvfile_path)
-    show_evaluate_result(args.csvfile_path)
+    if args.pre_test:
+        print("warning: you choose val the pre-a testdata")
+        evaluate_pre_a(args.csvfile_path)
+    else:
+        show_evaluate_result(args.csvfile_path)
 
 
 if __name__ == "__main__":
