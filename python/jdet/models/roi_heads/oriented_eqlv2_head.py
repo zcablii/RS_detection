@@ -199,7 +199,9 @@ class OrientedEQLv2Head(nn.Module):
 
     @property
     def use_sigmoid(self):
-        return self.loss_cls.use_sigmoid
+        use_sigmoid = getattr(self.loss_cls, 'use_sigmoid', False)
+        use_bce = getattr(self.loss_cls, 'use_bce', False)
+        return (use_sigmoid or use_bce)
 
     @property
     def group_activation(self):
@@ -638,8 +640,10 @@ class OrientedEQLv2Head(nn.Module):
             if self.use_sigmoid:
                 if self.group_activation:
                     scores = self.loss_cls.get_activation(cls_score)
+                    # print("scores.max():", scores.max())
                 else:
-                    raise ValueError("Must group_activation")
+                    # raise ValueError("Must group_activation")
+                    scores = jt.sigmoid(cls_score)
             else:
                 # softmax
                 raise ValueError("Must use_sigmoid")

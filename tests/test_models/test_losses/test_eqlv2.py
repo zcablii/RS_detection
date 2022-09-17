@@ -5,7 +5,7 @@ python tests/test_models/test_losses/test_eqlv2.py
 import jittor as jt
 from jdet.models.losses import EQLv2
 
-
+num_classes = 4
 
 labels = jt.Var([1,0,3,2,4])
 print("labels:\n", labels)
@@ -19,8 +19,17 @@ cls_score = jt.Var(
 )
 
 
-print("original cls_score:\n", cls_score)
-loss_cls = EQLv2(num_classes=4)
+# print("original cls_score:\n", cls_score)
+loss_cls = EQLv2(num_classes=num_classes)
+
+print("loss_cls 1:", loss_cls(cls_score, labels)) # 4.534896
+
+# loss_cls.pos_grad = jt.rand(num_classes).stop_grad()
+loss_cls.pos_grad = jt.Var([0.7910, 0.6721, 0.4647, 0.3477])
+# loss_cls.neg_grad = jt.rand(num_classes).stop_grad()
+loss_cls.neg_grad = jt.Var([0.3054, 0.9966, 0.7504, 0.2028])
+# self.pos_neg = (jt.ones(self.num_classes) * 100).stop_grad()
+loss_cls.pos_neg = jt.Var([0.0588, 0.2810, 0.2591, 0.9987])
 # bce = jt.nn.binary_cross_entropy_with_logits(cls_score, labels, size_average=False)
 # print("bce:", bce)
 
@@ -31,4 +40,4 @@ loss_cls = EQLv2(num_classes=4)
 # bce = jt.nn.binary_cross_entropy_with_logits(cls_score, labels, size_average=False)
 # print("bce:", bce)
 # test EQLv2
-print(loss_cls(cls_score, labels)) # 4.534896
+print("loss_cls 2:", loss_cls(cls_score, labels)) # 3.4176183
