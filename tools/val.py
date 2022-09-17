@@ -1,6 +1,7 @@
 import glob
 import os
 import numpy as np
+import pandas as pd
 import argparse
 from jdet.data.devkits.voc_eval import voc_eval_dota
 from jdet.ops.nms_poly import iou_poly
@@ -69,6 +70,7 @@ def read_xml(xml_path:str):
         point_list[i] = temp
     return image_idx, labels, point_list
 
+
 def read_xml_to_numpy(xml_list):
     gts = []
     diffcult_polys = {}
@@ -84,20 +86,64 @@ def read_xml_to_numpy(xml_list):
         gts.append(det)
     return np.concatenate(gts)
 
+def evaluate_pre_a(submit_csvfile_path):
+    print("Calculating Pre-a dataseet mAP......")
+    dets = read_csv_to_numpy(submit_csvfile_path)
+    gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "gts.npy") 
+    assert os.path.exists(gts_file_path),  "file {} not exits".format(gts_file_path)
+    gts = np.load(gts_file_path)
+    result = evaluate_new(gts, dets)
+    print("\nValidation Score:", result["meanAP"])
+    result.pop("meanAP")
+    for k, v in result.items():
+        print("{:.5f}".format(v), "({})".format(k))
 
-def evaluate(submit_csvfile_path, read_from_xml = False):
+def evaluate(submit_csvfile_path, read_from_xml = False, new_testdata = True):
     xml_list = glob.glob("val/*.xml")
     print("Calculating mAP......")
     print(submit_csvfile_path)
-    # dets[0].shape = 11 : idx, ploys, score, label
-    # gts[0].shape = 10  : idx, ploys, label
     dets = read_csv_to_numpy(submit_csvfile_path)
     if read_from_xml:
         gts = read_xml_to_numpy(xml_list)
     else:
-        gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "gts.npy") 
+        gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "new_gts.npy") 
         assert os.path.exists(gts_file_path),  "file {} not exits".format(gts_file_path)
         gts = np.load(gts_file_path)
+    
+    if new_testdata:
+        idx_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "idx.csv") 
+        assert os.path.exists(idx_file_path),  "file {} not exits".format(idx_file_path)
+        
+        judge_matrix = np.loadtxt(idx_file_path, delimiter=",")
+        avaiable_idx_list = judge_matrix[judge_matrix[:,2]==1][:,0]
+        gray_idx_list = judge_matrix[judge_matrix[:,1]==1][:,0]
+        color_idx_list = judge_matrix[(judge_matrix[:,1]==0) & (judge_matrix[:,2]==1)][:,0]
+        
+        avaiable_gts = extra_bool(avaiable_idx_list, gts)
+        avaiable_dets = extra_bool(avaiable_idx_list, dets)
+        gray_gts = extra_bool(gray_idx_list, gts)
+        gray_dets = extra_bool(gray_idx_list, dets)
+        color_gts = extra_bool(color_idx_list, gts)
+        color_dets = extra_bool(color_idx_list, dets)
+
+        avaiable_result = evaluate_new(avaiable_gts, avaiable_dets)
+        gray_result = evaluate_new(gray_gts, gray_dets)
+        color_result = evaluate_new(color_gts, color_dets)
+    return [avaiable_result, color_result, gray_result]
+
+def evaluate_in_training(csvfile_path, iter, logger):
+    assert os.path.exists(csvfile_path), "file {} not exits.".format(csvfile_path)
+    avaiable_result, color_result, gray_result = evaluate(csvfile_path)
+    print("")
+    show_str = ["total", "color", "gray"]
+    for i, each in enumerate([avaiable_result, color_result, gray_result]):
+        result = {}
+        result["({})Validation Score".format(show_str[i])] = "{:.6f}".format(float(each["meanAP"])) 
+        result.update(each)
+        result["iter"] = iter
+        logger.log(result)
+
+def evaluate_new(gts, dets):
     if len(dets) == 0:
         aps = {}
         for i, classname in tqdm(enumerate(FAIR1M_1_5_CLASSES), total = len(FAIR1M_1_5_CLASSES)):
@@ -124,35 +170,106 @@ def evaluate(submit_csvfile_path, read_from_xml = False):
             g = np.concatenate([g,dg])
             classname_gts[idx] = {"box":g.copy(),"det":[False for i in range(len(g))],'difficult':diffculty.copy()}
         rec, prec, ap = voc_eval_dota(c_dets,classname_gts,iou_func=iou_poly)
-        aps[classname + "_AP"]=ap 
-    map = sum(list(aps.values()))/len(aps)
+        aps[classname + "_AP"]=ap
+    class_ap_list = []
+    for ap in aps.values():
+        if ap != 0:
+            class_ap_list.append(ap)
+    map = sum(class_ap_list)/len(class_ap_list)
     aps["meanAP"]=map
     return aps
 
-def evaluate_in_training(csvfile_path, iter, logger):
-    assert os.path.exists(csvfile_path), "file {} not exits.".format(csvfile_path)
-    temp = evaluate(csvfile_path)
-    print("")
-    result = {}
-    result["Validation Score"] = "{:.6f}".format(float(temp["meanAP"])) 
-    result.update(temp)
-    result["iter"] = iter
-    logger.log(result)
+
+def extra_bool(extra_condition_list, data):
+    result = np.ones(data.shape[0]) == 1
+    for i in range(data.shape[0]):
+        if data[i][0] not in extra_condition_list:
+            result[i] = False
+    return data[result]
+
+
+def show_evaluate_result(csvfile_path):
+    print(csvfile_path)
+
+    # whether the file exists
+    gts_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "new_gts.npy") 
+    assert os.path.exists(gts_file_path),  "file {} not exits".format(gts_file_path)
+    idx_file_path = os.path.join(os.path.split(os.path.realpath(__file__))[0], "idx.csv") 
+    assert os.path.exists(idx_file_path),  "file {} not exits".format(idx_file_path)
     
+    # load data
+    gts = np.load(gts_file_path)
+    dets = read_csv_to_numpy(csvfile_path)
+    
+    # load idx to split matrix
+    judge_matrix = np.loadtxt(idx_file_path, delimiter=",")
+    gray_idx_list = judge_matrix[judge_matrix[:,1]==1][:,0]
+    color_idx_list = judge_matrix[(judge_matrix[:,1]==0) & (judge_matrix[:,2]==1)][:,0]
+    avaiable_idx_list = judge_matrix[judge_matrix[:,2]==1][:,0]
+
+    # split matrix
+    avaiable_gts = extra_bool(avaiable_idx_list, gts)
+    avaiable_dets = extra_bool(avaiable_idx_list, dets)
+    gray_gts = extra_bool(gray_idx_list, gts)
+    gray_dets = extra_bool(gray_idx_list, dets)
+    color_gts = extra_bool(color_idx_list, gts)
+    color_dets = extra_bool(color_idx_list, dets)
+
+    # statistics
+    count_dic = {"meanAP":[len(avaiable_gts), len(color_gts), len(gray_gts)]}
+    for i, data in enumerate(FAIR1M_1_5_CLASSES):
+        temp = []
+        temp.append(len(avaiable_gts[avaiable_gts[:,-1]==i+1]))
+        temp.append(len(color_gts[color_gts[:,-1]==i+1]))
+        temp.append(len(gray_gts[gray_gts[:,-1]==i+1]))
+        count_dic[data+"_AP"] = temp
+    
+    # evaluate the csv
+    avaiable_result = evaluate_new(avaiable_gts, avaiable_dets)
+    gray_result = evaluate_new(gray_gts, gray_dets)
+    color_result = evaluate_new(color_gts, color_dets)
+    print("\nValidation Score:", avaiable_result["meanAP"])
+
+    # merge the result
+    result = []
+    for key in avaiable_result.keys():
+        avaiable_ap = "{:.05f}".format(avaiable_result[key])
+        color_ap = "{:.05f}".format(color_result[key])
+        gray_ap = "{:.05f}".format(gray_result[key])
+        temp = [key, avaiable_ap, color_ap, gray_ap]
+        temp.extend(count_dic[key])
+        result.append(temp)
+
+    # use datafram to show
+    columns = ["name"]
+    columns.append("total_{}".format(len(avaiable_idx_list)))
+    columns.append("color_{}".format(len(color_idx_list)))
+    columns.append("gray_{}".format(len(gray_idx_list)))
+    columns.extend(["total_c", "color_c", "gray_c"])
+    result_ = pd.DataFrame(data = result, columns=columns)
+    print(result_)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--csvfile_path",
-        default="/opt/data/private/val_func/9120.csv",
+        default="/opt/data/private/new_val_func/8205.csv",
         type=str,
+    )
+    parser.add_argument(
+        "--pre_test",
+        default=False,
+        type=bool
     )
     args = parser.parse_args()
     assert os.path.exists(args.csvfile_path), "file {} not exits.".format(args.csvfile_path)
-    result = evaluate(args.csvfile_path)
-    print("\nValidation Score:", result["meanAP"])
-    result.pop("meanAP")
-    for k, v in result.items():
-        print("{:.5f}".format(v), "({})".format(k))
+    if args.pre_test:
+        print("warning: you choose val the pre-a testdata")
+        evaluate_pre_a(args.csvfile_path)
+    else:
+        show_evaluate_result(args.csvfile_path)
+
 
 if __name__ == "__main__":
     main()
