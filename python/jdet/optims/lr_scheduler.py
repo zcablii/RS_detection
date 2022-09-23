@@ -235,43 +235,89 @@ class StepLR(WarmUpLR):
             lr = max(lr, self.min_lr)
         return lr
 
-@SCHEDULERS.register_module()
-class CosineAnnealingLR(WarmUpLR):
+# @SCHEDULERS.register_module()
+# class CosineAnnealingLR(WarmUpLR):
 
-    def __init__(self, max_steps,min_lr=None, min_lr_ratio=None, **kwargs):
-        assert (min_lr is None) ^ (min_lr_ratio is None)
+#     def __init__(self,min_lr=None, min_lr_ratio=None, **kwargs):
+#         assert (min_lr is None) ^ (min_lr_ratio is None)
+#         self.min_lr = min_lr
+#         self.min_lr_ratio = min_lr_ratio
+#         super(CosineAnnealingLR, self).__init__(**kwargs)
+
+#     def get_lr(self, base_lr,factor): # factor = step/max_step
+#         if self.min_lr_ratio is not None:
+#             target_lr = base_lr * self.min_lr_ratio
+#         else:
+#             target_lr = self.min_lr
+#         cos_out = math.cos(math.pi * factor) + 1
+#         lr = target_lr + 0.5 * (base_lr - target_lr) * cos_out
+#         return lr
+
+# @SCHEDULERS.register_module()
+# class CosineAnnealingLRGroup(WarmUpLRGroup):
+
+#     def __init__(self, max_steps,min_lr=None, min_lr_ratio=None, **kwargs):
+#         assert (min_lr is None) ^ (min_lr_ratio is None)
+#         self.min_lr = min_lr
+#         self.min_lr_ratio = min_lr_ratio
+#         self.max_steps = max_steps
+#         super(CosineAnnealingLRGroup, self).__init__(**kwargs)
+
+#     def get_lr(self, base_lr,steps):
+#         if self.min_lr_ratio is not None:
+#             target_lr = base_lr * self.min_lr_ratio
+#         else:
+#             target_lr = self.min_lr
+#         cos_out = math.cos(math.pi * (steps / self.max_steps)) + 1
+#         lr = target_lr + 0.5 * (base_lr - target_lr) * cos_out
+#         return lr
+@SCHEDULERS.register_module()
+class CosineAnnealingLR(object):
+    """Warm LR scheduler, which is the base lr_scheduler,default we use it.
+    Args:
+        optimizer (Optimizer): the optimizer to optimize the model
+        warmup (string): Type of warmup used. It can be None(use no warmup),
+            'constant', 'linear' or 'exp'
+        warmup_iters (int): The number of iterations or epochs that warmup
+            lasts
+        warmup_ratio (float): LR used at the beginning of warmup equals to
+            warmup_ratio * initial_lr
+    """
+    def __init__(self,optimizer,min_lr=None, min_lr_ratio=None,):
+        self.optimizer = optimizer
         self.min_lr = min_lr
         self.min_lr_ratio = min_lr_ratio
-        self.max_steps = max_steps
-        super(CosineAnnealingLR, self).__init__(**kwargs)
-
-    def get_lr(self, base_lr,steps):
+        self.base_lr = optimizer.lr
+        self.base_lr_pg = [pg.get("lr", optimizer.lr) for pg in optimizer.param_groups]
+        self.step(0, 0)
+    
+    
+    def get_lr(self, base_lr,factor): # factor = step/max_step
         if self.min_lr_ratio is not None:
             target_lr = base_lr * self.min_lr_ratio
         else:
             target_lr = self.min_lr
-        cos_out = math.cos(math.pi * (steps / self.max_steps)) + 1
+        cos_out = math.cos(math.pi * factor) + 1
         lr = target_lr + 0.5 * (base_lr - target_lr) * cos_out
         return lr
+    
+    def _update_lr(self,factor,get_lr_func):
+        self.optimizer.lr = get_lr_func(self.base_lr,factor)
+        for i, param_group in enumerate(self.optimizer.param_groups):
+            param_group["lr"] = get_lr_func(self.base_lr_pg[i],factor)
 
-@SCHEDULERS.register_module()
-class CosineAnnealingLRGroup(WarmUpLRGroup):
+    def step(self,factor,placeholder=None):
+        self._update_lr(factor,self.get_lr)
 
-    def __init__(self, max_steps,min_lr=None, min_lr_ratio=None, **kwargs):
-        assert (min_lr is None) ^ (min_lr_ratio is None)
-        self.min_lr = min_lr
-        self.min_lr_ratio = min_lr_ratio
-        self.max_steps = max_steps
-        super(CosineAnnealingLRGroup, self).__init__(**kwargs)
-
-    def get_lr(self, base_lr,steps):
-        if self.min_lr_ratio is not None:
-            target_lr = base_lr * self.min_lr_ratio
-        else:
-            target_lr = self.min_lr
-        cos_out = math.cos(math.pi * (steps / self.max_steps)) + 1
-        lr = target_lr + 0.5 * (base_lr - target_lr) * cos_out
-        return lr
+    def parameters(self):
+        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
+    
+    def load_parameters(self,data):
+        if isinstance(data,dict):
+            for k,d in data.items():
+                if k in self.__dict__:
+                    self.__dict__[k]=d 
+                    
 
 @SCHEDULERS.register_module()
 class ExpLR(WarmUpLR):

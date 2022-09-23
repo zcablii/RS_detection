@@ -46,6 +46,11 @@ class Runner:
         self.val_dataset = build_from_cfg(cfg.dataset.val,DATASETS)
         self.test_dataset = build_from_cfg(cfg.dataset.test,DATASETS)
         
+        
+        self.swa_start_epoch = cfg.swa_start_epoch
+        self.optimizer_swa = build_from_cfg(cfg.optimizer_swa,OPTIMS,params=params)
+        self.scheduler_swa = build_from_cfg(cfg.scheduler_swa,SCHEDULERS,optimizer=self.optimizer_swa)
+
         self.logger = build_from_cfg(self.cfg.logger,HOOKS,work_dir=self.work_dir)
 
         save_file = build_file(self.work_dir,prefix="config.yaml")
@@ -54,14 +59,17 @@ class Runner:
         self.iter = 0
         self.epoch = 0
 
-
+        self.model_only = self.cfg.model_only
         if (cfg.pretrained_weights):
             self.load(cfg.pretrained_weights, model_only=True)
         
         if self.resume_path is None:
             self.resume_path = search_ckpt(self.work_dir)
         if check_file(self.resume_path):
-            self.resume()
+            if self.model_only:
+                self.resume(model_only=True)
+            else:
+                self.resume(model_only=False)
 
         self.max_epoch = cfg.max_epoch 
         if self.max_epoch:
@@ -123,13 +131,20 @@ class Runner:
         self.model.train()
 
         start_time = time.time()
-
+        data_set_len = len(self.train_dataset)
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
 
             losses = self.model(images,targets)
             all_loss,losses = parse_losses(losses)
-            self.optimizer.step(all_loss)
-            self.scheduler.step(self.iter,self.epoch,by_epoch=True)
+            if self.swa_start_epoch is not None and self.epoch>= self.swa_start_epoch:
+                self.optimizer_swa.step(all_loss)
+                factor = batch_idx / data_set_len
+                self.scheduler_swa.step(factor)
+                temp_optimizer = self.optimizer_swa
+            else:
+                self.optimizer.step(all_loss)
+                self.scheduler.step(self.iter,self.epoch,by_epoch=True)
+                temp_optimizer = self.optimizer
             if check_interval(self.iter,self.log_interval) and self.iter>0:
                 batch_size = len(images)*jt.world_size
                 ptime = time.time()-start_time
@@ -138,7 +153,7 @@ class Runner:
                 eta_str = str(datetime.timedelta(seconds=int(eta_time)))
                 data = dict(
                     name = self.cfg.name,
-                    lr = self.optimizer.cur_lr(),
+                    lr = temp_optimizer.cur_lr(),
                     iter = self.iter,
                     epoch = self.epoch,
                     batch_idx = batch_idx,
@@ -269,5 +284,5 @@ class Runner:
 
         self.logger.print_log(f"Loading model parameters from {load_path}")
 
-    def resume(self):
-        self.load(self.resume_path)
+    def resume(self, model_only=False):
+        self.load(self.resume_path, model_only)
