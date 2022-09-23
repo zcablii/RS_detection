@@ -197,7 +197,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/preprocessed_ms/test_1024_200_0.5-1.0-1.5/images',
+        images_dir=f'{dataset_root}/test_2_preprocessed_ms/test_1024_200_0.5-1.0-1.5/images',
         transforms=[
             dict(
                 type="RotatedResize",

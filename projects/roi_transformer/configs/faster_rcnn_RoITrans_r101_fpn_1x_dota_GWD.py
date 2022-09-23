@@ -143,7 +143,7 @@ model = dict(
 )
 
 # dataset settings
-dataset_root = '/media/data3/lyx/Detection'
+dataset_root = '/opt/data/private/LYX/data'
 dataset = dict(
     train=dict(
         type="FAIR1M_1_5_Dataset",
@@ -169,7 +169,7 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=8,
+        batch_size=12,
         num_workers=8,
         shuffle=True,
         filter_empty_gt=False
@@ -192,7 +192,7 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False),
         ],
-        batch_size=8,
+        batch_size=12,
         num_workers=8,
         shuffle=False
     ),
@@ -216,7 +216,7 @@ dataset = dict(
         ],
         dataset_type="FAIR1M_1_5",
         num_workers=4,
-        batch_size=1,
+        batch_size=12,
     )
 )
 
@@ -241,6 +241,6 @@ scheduler = dict(
 logger = dict(
     type="RunLogger")
 max_epoch = 12
-eval_interval = 6
+eval_interval = 1
 checkpoint_interval = 1
 log_interval = 20

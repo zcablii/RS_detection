@@ -5,6 +5,7 @@ import os
 import logging
 from tensorboardX import SummaryWriter
 from jdet.config import get_cfg
+import jittor as jt
 
 @HOOKS.register_module()
 class TextLogger:
@@ -23,7 +24,8 @@ class TensorboardLogger:
     def __init__(self,work_dir):
         self.cfg = get_cfg()
         tensorboard_dir = os.path.join(work_dir,"tensorboard")
-        self.writer = SummaryWriter(tensorboard_dir,flush_secs=10)
+        if jt.rank == 0:
+            self.writer = SummaryWriter(tensorboard_dir,flush_secs=10)
 
     def log(self,data):
         step = data["iter"]

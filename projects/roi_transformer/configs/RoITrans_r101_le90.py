@@ -18,7 +18,7 @@ model = dict(
         in_channels=256,
         feat_channels=256,
         anchor_scales=[8],
-        anchor_ratios=[0.5, 1.0, 2.0],
+        anchor_ratios=[0.2, 0.5, 1.0, 2.0, 5.0],
         anchor_strides=[4, 8, 16, 32, 64],
         target_means=[.0, .0, .0, .0],
         target_stds=[1.0, 1.0, 1.0, 1.0],
@@ -143,7 +143,7 @@ angle_version = 'le90'
 dataset = dict(
     train=dict(
         type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/FAIR1M2.0_preprocessed_ms/train_1024_200_0.5-1.0-1.5',
+        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -167,7 +167,7 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=14,
+        batch_size=16,
         num_workers=8,
         shuffle=True,
         filter_empty_gt=False
@@ -197,7 +197,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/preprocessed_ms/test_1024_200_0.5-1.0-1.5/images',
+        images_dir=f'{dataset_root}/test_2_preprocessed_ms/test_1024_200_0.5-1.0-1.5/images',
         transforms=[
             dict(
                 type="RotatedResize",
@@ -238,9 +238,21 @@ scheduler = dict(
     warmup_ratio=1.0 / 3,
     milestones=[8, 11])
 
+optimizer_swa = dict(type='SGD',  lr=0.0025, momentum=0.9, weight_decay=0.0001)
+
+scheduler_swa = dict(
+    type='CosineAnnealingLR',
+    min_lr = 0.000025
+    )
+
 logger = dict(
     type="RunLogger")
-max_epoch = 12
-eval_interval = 6
+swa_start_epoch = 12
+
+max_epoch = 24
+eval_interval = 1
 checkpoint_interval = 1
 log_interval = 100
+
+model_only = True
+resume_path = '/opt/data/private/LYX/RS_detection/work_dirs/RoITrans_r101_le90/checkpoints/swa_13-24.pkl'
