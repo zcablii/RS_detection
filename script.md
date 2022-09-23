@@ -56,7 +56,37 @@ target_dataset_path='{DATASET_PATH}/preprocessed'
 
 ```shell
 python tools/run_net.py --config-file projects/oriented_rcnn/configs/oriented_rcnn_r101_fpn_1x_dota_ms_with_flip_rotate_balance_cate.py
+
+CUDA_VISIBLE_DEVICES='4,5,6,7' mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/roi_transformer/configs/RoITrans_r101_le90.py
 ```
+
+
+python tools/val.py --csvfile_path submit_zips/RoITrans_r101_le90.csv
+
+
+If used swa, add lines below in config files:
+```shell
+optimizer_swa = dict(type='SGD',  lr=0.0025, momentum=0.9, weight_decay=0.0001)
+scheduler_swa = dict(
+    type='CosineAnnealingLR',
+    min_lr = 0.000025
+    )
+swa_start_epoch = 12
+max_epoch = 24
+```
+
+Merge swa models:
+```shell
+python tools/get_SWA_model.py --model_dir work_dirs/RoITrans_r101_le90/checkpoints/ --starting_model_id 13 --ending_model_id 24 --save_dir work_dirs/RoITrans_r101_le90/checkpoints/
+```
+
+Test on merged model: in config file, add 
+
+```shell
+model_only = True
+resume_path = '/opt/data/private/LYX/RS_detection/work_dirs/RoITrans_r101_le90/checkpoints/swa_13-24.pkl'
+```
+
 
 3. Run Tensorboard on Server-side, monitor on local:
 
