@@ -5,12 +5,96 @@ from jittor import nn
 from jdet.models.losses import weighted_cross_entropy
 from jdet.utils.registry import LOSSES
 
+
+def cross_entropy(output, target, weight=None, ignore_index=None,
+                  reduction='mean'):
+    target_shape = target.shape
+    if len(output.shape) == 4:
+        c_dim = output.shape[1]
+        output = output.transpose((0, 2, 3, 1))
+        output = output.reshape((-1, c_dim))
+
+    target = target.reshape((-1, ))
+    target_weight = jt.ones(target.shape[0], dtype='float32')
+    if weight is not None:
+        target_weight = weight[target]
+    if ignore_index is not None:
+        target_weight = jt.ternary(
+            target==ignore_index,
+            jt.array(0).broadcast(target_weight),
+            target_weight
+        )
+
+    target = target.broadcast(output, [1])
+    target = target.index(1) == target
+
+    output = output - output.max([1], keepdims=True)
+    logsum = output.exp().sum(1).log()
+    loss = (logsum - (output*target).sum(1)) * target_weight
+    if reduction == 'sum':
+        return loss.sum()
+    elif reduction == 'mean':
+        return loss.mean() / target_weight.mean()
+    else:
+        return loss.reshape(target_shape)
+
 def one_hot(index, num_classes):
     ret = jt.zeros((index.shape[0], num_classes))
     index1 = jt.arange(0, index.shape[0]).reshape(-1, 1)
     index2 = index.reshape(-1, 1)
     ret[index1, index2] = 1
     return ret
+
+def reduce_loss(loss, reduction):
+    """Reduce loss as specified.
+
+    Args:
+        loss (Tensor): Elementwise loss tensor.
+        reduction (str): Options are "none", "mean" and "sum".
+
+    Return:
+        Tensor: Reduced loss tensor.
+    """
+    assert reduction in ["none", "mean", "sum"]
+    # reduction_enum = F._Reduction.get_enum(reduction)
+    # none: 0, elementwise_mean:1, sum: 2
+    if reduction == "none":
+        return loss
+    elif reduction == "mean":
+        return loss.mean()
+    elif reduction == "sum":
+        return loss.sum()
+
+def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
+    """Apply element-wise weight and reduce loss.
+
+    Args:
+        loss (Tensor): Element-wise loss.
+        weight (Tensor): Element-wise weights.
+        reduction (str): Same as built-in losses of PyTorch.
+        avg_factor (float): Average factor when computing the mean of losses.
+
+    Returns:
+        Tensor: Processed loss values.
+    """
+    # if weight is specified, apply element-wise weight
+    if weight is not None:
+        loss = loss * weight
+
+    # if avg_factor is not specified, just reduce the loss
+    if avg_factor is None:
+        loss = reduce_loss(loss, reduction)
+    else:
+        # if reduction is mean, then average the loss by avg_factor
+        if reduction == 'mean':
+            # Avoid causing ZeroDivisionError when avg_factor is 0.0,
+            # i.e., all labels of an image belong to ignore index.
+            eps = 0.00001
+            loss = loss.sum() / (avg_factor + eps)
+        # if reduction is 'none', then do nothing, otherwise raise an error
+        elif reduction != 'none':
+            raise ValueError('avg_factor can not be used with reduction="sum"')
+    return loss
 
 def seesaw_ce_loss(cls_score,
                    labels,
@@ -70,12 +154,13 @@ def seesaw_ce_loss(cls_score,
 
     cls_score = cls_score + (seesaw_weights.log() * (1 - onehot_labels))
 
+    # 实现 jittor 版本的 cross_entropy
+    loss = cross_entropy(cls_score, labels, weight=None, reduction='none')
+
     if label_weights is not None:
         label_weights = label_weights.float()
-    reduce = True if reduction == 'mean' else False
-    assert reduction in ['none', 'mean', 'sum']
-    loss = weighted_cross_entropy(cls_score, labels, weight=label_weights,
-                                  avg_factor=avg_factor, reduce=reduce)
+    loss = weight_reduce_loss(
+        loss, weight=label_weights, reduction=reduction, avg_factor=avg_factor)
     return loss
 
 

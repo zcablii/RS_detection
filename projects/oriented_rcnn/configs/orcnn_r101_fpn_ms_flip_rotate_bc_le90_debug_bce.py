@@ -1,20 +1,18 @@
 """Script
 # 单卡训练
-python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_bce.py
+python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_debug_bce.py
 
 # 指定多卡训练
-CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_bce.py
-
-CUDA_VISIBLE_DEVICES="2,3" mpirun --allow-run-as-root -np 2 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_bce.py
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_debug_bce.py
 
 # 单卡测试生成 csv
-python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_bce.py --task test
+python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_debug_bce.py --task test
 
 # 指定多卡测试生成 csv
-CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_bce.py --task test
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_debug_bce.py --task test
 
 # 根据 csv 离线算分数
-python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_bce.csv
+python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_debug_bce.csv
 """
 
 dataset_root = '/yimian'
@@ -40,6 +38,8 @@ model = dict(
         nms_thresh=0.8,
         nms_pre=2000,
         nms_post=2000,
+        # nms_pre=4000,
+        # nms_post=4000,
         feat_channels=256,
         bbox_type='obb',
         reg_dim=6,
@@ -79,6 +79,7 @@ model = dict(
         in_channels=256,
         fc_out_channels=1024,
         score_thresh=0.05,
+        # score_thresh=0.001,
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
@@ -125,7 +126,7 @@ model = dict(
         pos_weight=-1,
         )
     )
-    
+
 angle_version = 'le90'
 dataset = dict(
     train=dict(
@@ -153,8 +154,8 @@ dataset = dict(
                 std=[58.395, 57.12, 57.375],
                 to_bgr=False,)
         ],
-        batch_size=4,
-        num_workers=8,
+        batch_size=8,
+        num_workers=16,
         shuffle=True,
         filter_empty_gt=False
     ),
@@ -177,8 +178,8 @@ dataset = dict(
                 std=[58.395, 57.12, 57.375],
                 to_bgr=False),
         ],
-        batch_size=4,
-        num_workers=8,
+        batch_size=8,
+        num_workers=16,
         shuffle=False
     ),
     test=dict(
@@ -201,13 +202,14 @@ dataset = dict(
                 to_bgr=False,),
         ],
         dataset_type="FAIR1M_1_5",
-        num_workers=8,
+        num_workers=16,
         batch_size=1,
     )
 )
 
 
-optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
+# optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(type='SGD',  lr=0.02, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
     type='StepLR',
@@ -223,4 +225,4 @@ logger = dict(
 max_epoch = 12 # 12
 eval_interval = 100
 checkpoint_interval = 1
-log_interval = 200
+log_interval = 50

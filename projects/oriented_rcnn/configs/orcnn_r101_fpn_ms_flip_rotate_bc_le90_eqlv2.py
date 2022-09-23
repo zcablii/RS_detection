@@ -5,6 +5,8 @@ python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_
 # 指定多卡训练
 CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_eqlv2.py
 
+CUDA_VISIBLE_DEVICES="0,1" mpirun --allow-run-as-root -np 2 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_eqlv2.py
+
 # 单卡测试生成 csv
 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_eqlv2.py --task test
 
@@ -49,7 +51,7 @@ model = dict(
         anchor_generator=dict(
             type='AnchorGenerator',
             scales=[8],
-            ratios=[0.5, 1.0, 2.0],
+            ratios=[0.2, 0.5, 1.0, 2.0, 5.0],
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
             type='MidpointOffsetCoder',
@@ -78,7 +80,7 @@ model = dict(
         num_classes=num_classes,
         in_channels=256,
         fc_out_channels=1024,
-        score_thresh=0.05,
+        score_thresh=0.01,
         # score_thresh=0.001,
         assigner=dict(
             type='MaxIoUAssigner',
@@ -107,6 +109,9 @@ model = dict(
             featmap_strides=[4, 8, 16, 32]),
         loss_cls=dict(
             type='EQLv2',
+            gamma=12,
+            mu=0.8,
+            alpha=4.0,
             num_classes=num_classes),
         loss_bbox=dict(
             type='SmoothL1Loss',
@@ -202,7 +207,7 @@ dataset = dict(
                 to_bgr=False,),
         ],
         dataset_type="FAIR1M_1_5",
-        num_workers=16,
+        num_workers=8,
         batch_size=1,
     )
 )
@@ -225,4 +230,4 @@ logger = dict(
 max_epoch = 12 # 12
 eval_interval = 100
 checkpoint_interval = 1
-log_interval = 50
+log_interval = 200

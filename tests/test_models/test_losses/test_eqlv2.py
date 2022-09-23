@@ -2,8 +2,28 @@
 python tests/test_models/test_losses/test_eqlv2.py
 """
 
+from functools import partial
+import imp
+import numpy as np
 import jittor as jt
 from jdet.models.losses import EQLv2
+from matplotlib import pyplot as plt
+
+gamma = 12
+mu    = 0.8
+alpha = 4.0
+def _func(x, gamma, mu):
+    return 1 / (1 + np.exp(-gamma * (x - mu)))
+map_func = partial(_func, gamma=gamma, mu=mu)
+
+pos_neg = np.linspace(0, 2, 20)
+neg_w = map_func(np.linspace(0, 2, 20))
+pos_w = 1 + alpha * (1 - neg_w)
+plt.plot(pos_neg, neg_w)
+plt.plot(pos_neg, pos_w)
+print("map_func(np.linspace(0, 2, 20):", map_func(np.linspace(0, 2, 20)))
+
+
 
 num_classes = 4
 
@@ -29,6 +49,7 @@ loss_cls.pos_grad = jt.Var([0.7910, 0.6721, 0.4647, 0.3477])
 # loss_cls.neg_grad = jt.rand(num_classes).stop_grad()
 loss_cls.neg_grad = jt.Var([0.3054, 0.9966, 0.7504, 0.2028])
 # self.pos_neg = (jt.ones(self.num_classes) * 100).stop_grad()
+loss_cls.pos_neg = jt.Var([0.0588, 0.2810, 0.2591, 0.9987])
 loss_cls.pos_neg = jt.Var([0.0588, 0.2810, 0.2591, 0.9987])
 # bce = jt.nn.binary_cross_entropy_with_logits(cls_score, labels, size_average=False)
 # print("bce:", bce)

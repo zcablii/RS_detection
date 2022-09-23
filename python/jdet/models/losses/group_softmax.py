@@ -7,6 +7,37 @@ from jittor import nn
 from jdet.models.losses import weighted_cross_entropy
 from jdet.utils.registry import LOSSES
 
+def cross_entropy(output, target, weight=None, ignore_index=None,
+                  reduction='mean'):
+    target_shape = target.shape
+    if len(output.shape) == 4:
+        c_dim = output.shape[1]
+        output = output.transpose((0, 2, 3, 1))
+        output = output.reshape((-1, c_dim))
+
+    target = target.reshape((-1, ))
+    target_weight = jt.ones(target.shape[0], dtype='float32')
+    if weight is not None:
+        target_weight = weight[target]
+    if ignore_index is not None:
+        target_weight = jt.ternary(
+            target==ignore_index,
+            jt.array(0).broadcast(target_weight),
+            target_weight
+        )
+
+    target = target.broadcast(output, [1])
+    target = target.index(1) == target
+
+    output = output - output.max([1], keepdims=True)
+    logsum = output.exp().sum(1).log()
+    loss = (logsum - (output*target).sum(1)) * target_weight
+    if reduction == 'sum':
+        return loss.sum()
+    elif reduction == 'mean':
+        return loss.mean() / target_weight.mean()
+    else:
+        return loss.reshape(target_shape)
 
 FAIR1M_1_5_CATEGORIES = [
     {'name': 'Airplane', 'instance_count': 10671, 'id': 1},
@@ -171,11 +202,17 @@ class GroupSoftmax(nn.Module):
             label_in_group = new_labels[group_id]
             weight_in_group = new_weights[group_id]
             avg_in_group = new_avg[group_id]
-            loss_in_group = weighted_cross_entropy(pred_in_group,
-                                                   label_in_group,
-                                                   weight=weight_in_group,
-                                                   avg_factor=avg_in_group,
-                                                   reduce=True)
+            # loss_in_group = weighted_cross_entropy(pred_in_group,
+            #                                        label_in_group,
+            #                                        weight=weight_in_group,
+            #                                        avg_factor=avg_in_group,
+            #                                        reduce=True)
+            loss_in_group = cross_entropy(pred_in_group,
+                                          label_in_group,
+                                          reduction='none',
+                                          ignore_index=-1)
+            loss_in_group = jt.sum(loss_in_group * weight_in_group)
+            loss_in_group /= avg_in_group
             cls_loss.append(loss_in_group)
         cls_loss = sum(cls_loss)
         return cls_loss * self.loss_weight
@@ -194,6 +231,10 @@ class GroupSoftmax(nn.Module):
         return activation
 
     def get_cls_channels(self, num_classes):
+        num_channel = num_classes + 1 + self.num_group
+        return num_channel
+
+    def get_channel_num(self, num_classes):
         num_channel = num_classes + 1 + self.num_group
         return num_channel
 
