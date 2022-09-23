@@ -30,7 +30,7 @@ def main():
         default="./vis_imgs",
         type=str,
     )
-    
+
     args = parser.parse_args()
 
     if not args.no_cuda:

@@ -22,7 +22,7 @@ def _expand_binary_labels(labels, label_weights, label_channels):
         (label_weights.size(0), label_channels))
     return bin_labels, bin_label_weights
 
-def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):
+def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None, **kwargs):
     if pred.ndim != label.ndim:
         label, weight = _expand_binary_labels(label, weight, pred.size(-1))
     if avg_factor is None:

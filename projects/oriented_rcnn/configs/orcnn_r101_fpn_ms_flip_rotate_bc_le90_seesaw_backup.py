@@ -1,9 +1,9 @@
 """Script
 # 单卡训练
-python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.py
+python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw_backup.py
 
 # 指定多卡训练
-CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.py
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw_backup.py
 
 # 验证集
 python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.csv

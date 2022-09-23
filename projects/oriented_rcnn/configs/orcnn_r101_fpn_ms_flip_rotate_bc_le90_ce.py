@@ -1,12 +1,12 @@
 """Script
 # 单卡训练
-python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.py
+python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_ce.py
 
 # 指定多卡训练
-CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.py
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_ce.py
 
 # 验证集
-python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.csv
+python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_eqlv2.csv
 """
 
 dataset_root = '/yimian'
@@ -97,12 +97,7 @@ model = dict(
             extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
         loss_cls=dict(
-            type='SeesawLoss',
-            p=0.8,
-            q=2.0,
-            num_classes=num_classes,
-            loss_weight=1.0,
-            return_dict=False),
+            type='CrossEntropyLoss'),
         loss_bbox=dict(
             type='SmoothL1Loss',
             beta=1.0,

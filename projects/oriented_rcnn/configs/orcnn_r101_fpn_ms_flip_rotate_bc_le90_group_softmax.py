@@ -1,12 +1,18 @@
 """Script
 # 单卡训练
-python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.py
+python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_group_softmax.py
 
 # 指定多卡训练
-CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.py
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_group_softmax.py
 
-# 验证集
-python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_seesaw.csv
+# 单卡测试生成 csv
+python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_group_softmax.py --task test
+
+# 指定多卡测试生成 csv
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun --allow-run-as-root -np 4 python tools/run_net.py --config-file projects/oriented_rcnn/configs/orcnn_r101_fpn_ms_flip_rotate_bc_le90_group_softmax.py --task test
+
+# 根据 csv 离线算分数
+python tools/val.py --csvfile_path submit_zips/orcnn_r101_fpn_ms_flip_rotate_bc_le90_group_softmax.csv
 """
 
 dataset_root = '/yimian'
@@ -71,6 +77,7 @@ model = dict(
         in_channels=256,
         fc_out_channels=1024,
         score_thresh=0.05,
+        # score_thresh=0.01,
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
@@ -97,12 +104,7 @@ model = dict(
             extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
         loss_cls=dict(
-            type='SeesawLoss',
-            p=0.8,
-            q=2.0,
-            num_classes=num_classes,
-            loss_weight=1.0,
-            return_dict=False),
+            type='GroupSoftmax'),
         loss_bbox=dict(
             type='SmoothL1Loss',
             beta=1.0,
@@ -121,7 +123,7 @@ model = dict(
         pos_weight=-1,
         )
     )
-    
+
 angle_version = 'le90'
 dataset = dict(
     train=dict(
@@ -203,6 +205,7 @@ dataset = dict(
 )
 
 
+# optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
 
 scheduler = dict(
