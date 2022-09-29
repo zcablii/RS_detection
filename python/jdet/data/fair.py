@@ -105,3 +105,46 @@ class FAIR1M_1_5_Dataset(DOTADataset):
             index = area>1.
             img_info["ann"]["bboxes"] = img_info["ann"]["bboxes"][index]
             img_info["ann"]["labels"] = img_info["ann"]["labels"][index]
+
+    def _balance_categories(self):
+        img_infos = self.img_infos
+        cate_dict = {}
+        for idx,img_info in enumerate(img_infos):
+            unique_labels = np.unique(img_info["ann"]["labels"])
+            for label in unique_labels:
+                if label not in cate_dict:
+                    cate_dict[label]=[]
+                cate_dict[label].append(idx)
+        new_idx = []
+        balance_dict={
+            # gamma=9, mu=0.6, alpha=4, mAP=0.8790
+            # 'Airplane': (1, 0),
+            # 'Ship': (2,0),
+            # 'Vehicle': (1,0),
+            # 'Basketball_Court': (4,0),
+            # 'Tennis_Court': (2,0),
+            # "Football_Field": (7,0),
+            # "Baseball_Field": (2,0),
+            # 'Intersection': (5,0),
+            # 'Roundabout': (3,0),
+            # 'Bridge': (10,0),
+
+            'Airplane': (1, 0),
+            'Ship': (2,0),
+            'Vehicle': (1,0),
+            'Basketball_Court': (2,0),
+            'Tennis_Court': (1,0),
+            "Football_Field": (2,0),
+            "Baseball_Field": (2,0),
+            'Intersection': (4,0),
+            'Roundabout': (1,0),
+            'Bridge': (8,0),
+        }
+        print("balance_dict:", balance_dict)
+        for k,d in cate_dict.items():
+            classname = self.CLASSES[k-1]
+            l1,l2 = balance_dict.get(classname,(1,0))
+            new_d = d*l1+d[:l2]
+            new_idx.extend(new_d)
+        img_infos = [self.img_infos[idx] for idx in new_idx]
+        return img_infos

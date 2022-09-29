@@ -204,7 +204,7 @@ def Convnext_base(pretrained=False, in_22k=False, **kwargs):
 def Convnext_large(pretrained=False, in_22k=False, **kwargs):
     model = ConvNeXt(depths=[3, 3, 27, 3], dims=[192, 384, 768, 1536], **kwargs)
     if pretrained:
-        print('loading model convNext xlarge')
+        print('loading model convNext large')
         ckpt_path = '/opt/data/private/LYX/data/pretrained/convnext_large_1k_384.pth'
         state_dict = jt.load(ckpt_path)['model']
  

@@ -35,8 +35,12 @@ class EQLv2(nn.Module):
         self.alpha = alpha
 
         # initial variables
-        self.pos_grad = jt.zeros(self.num_classes).stop_grad()
-        self.neg_grad = jt.zeros(self.num_classes).stop_grad()
+        self.pos_grad = jt.ones(self.num_classes).stop_grad() * 0.0001
+        # * jt.Var([0.0001,], dtype=jt.float64).expand(self.num_classes)
+        self.neg_grad = jt.ones(self.num_classes).stop_grad() * 0.0001
+        # * jt.Var([0.0001,], dtype=jt.float64).expand(self.num_classes)
+        # self.pos_grad = jt.ones(self.num_classes).stop_grad() * 0.00001
+        # self.neg_grad = jt.ones(self.num_classes).stop_grad() * 0.00001
         # At the beginning of training, we set a high value (eg. 100)
         # for the initial gradient ratio so that the weight for pos gradients and neg gradients are 1.
         self.pos_neg = (jt.ones(self.num_classes) * 100).stop_grad()
@@ -102,7 +106,8 @@ class EQLv2(nn.Module):
 
         self.pos_grad += pos_grad
         self.neg_grad += neg_grad
-        self.pos_neg = self.pos_grad / (self.neg_grad + 1e-10)
+        # self.pos_neg = self.pos_grad / (self.neg_grad + 1e-5)
+        self.pos_neg = self.pos_grad / self.neg_grad
 
     def get_weight(self, cls_score):
         neg_w = jt.concat([self.map_func(self.pos_neg), jt.ones(1)])

@@ -23,11 +23,8 @@ from jdet.ops.bbox_transforms import poly2obb
 
 ## the thresh for nms when merge image
 nms_threshold_0 = 0.1
-nms_threshold_1 = {'roundabout': 0.1, 'tennis-court': 0.3, 'swimming-pool': 0.1, 'storage-tank': 0.2,
-                'soccer-ball-field': 0.3, 'small-vehicle': 0.2, 'ship': 0.2, 'plane': 0.3,
-                'large-vehicle': 0.1, 'helicopter': 0.2, 'harbor': 0.0001, 'ground-track-field': 0.3,
-                'bridge': 0.0001, 'basketball-court': 0.3, 'baseball-diamond': 0.3,
-                'container-crane': 0.05, 'airport': 0.1, 'helipad': 0.1}
+nms_threshold_1 = {'Roundabout': 0.1, 'Tennis_Court': 0.1, 'Football_Field': 0.1, 'Vehicle': 0.15, 'Ship': 0.2, 'Airplane': 0.3,
+                'Intersection': 0.3, 'Bridge': 0.0001, 'Basketball_Court': 0.1, 'Baseball_Field': 0.1}
 
 
 def py_cpu_nms_poly(dets, thresh):

@@ -17,7 +17,8 @@ import shutil
 from tqdm import tqdm
 from jittor_utils import auto_diff
 import copy
-
+# jt.flags.lazy_execution=0
+jt.cudnn.set_max_workspace_ratio(0.0)
 
 class Runner:
     def __init__(self):
@@ -94,6 +95,7 @@ class Runner:
             self.train()
             if check_interval(self.epoch,self.checkpoint_interval):
                 self.save()
+                jt.gc()
             if check_interval(self.epoch,self.eval_interval):
                 # TODO: need remove this
                 # self.val()
@@ -135,6 +137,7 @@ class Runner:
         for batch_idx,(images,targets) in enumerate(self.train_dataset):
 
             losses = self.model(images,targets)
+            # print('----------',losses,[len(e['rboxes']) for e in targets], [each['img_file'] for each in targets] )
             all_loss,losses = parse_losses(losses)
             if self.swa_start_epoch is not None and self.epoch>= self.swa_start_epoch:
                 self.optimizer_swa.step(all_loss)
@@ -171,6 +174,8 @@ class Runner:
             self.iter+=1
             if self.finish:
                 break
+            jt.sync_all()
+            # jt.display_memory_info()
         self.epoch +=1
 
 

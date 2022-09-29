@@ -34,7 +34,7 @@ class SGD(optim.SGD,Optimizer):
     
 @OPTIMS.register_module()
 class AdamW(optim.AdamW,Optimizer):
-    def __init__(self,params, lr, eps=1e-8, betas=(0.9, 0.999), weight_decay=0,grad_clip=None):
+    def __init__(self,params, lr, eps=1e-8, betas=(0.9, 0.999), weight_decay=0, grad_clip=None):
         super(AdamW,self).__init__(params, lr, eps, betas, weight_decay)
         self.grad_clip = grad_clip
 

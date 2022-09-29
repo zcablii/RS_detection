@@ -473,7 +473,7 @@ def poly_to_rotated_box_single(poly,angle_version):
     rotated_box = np.array([x_ctr, y_ctr, width, height, angle])
     return rotated_box
 
-def poly_to_rotated_box_np(polys, angle_version):
+def poly_to_rotated_box_np(polys, angle_version='le90'):
     """
     poly:[x0,y0,x1,y1,x2,y2,x3,y3]
     to

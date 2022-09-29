@@ -10,6 +10,162 @@ from jdet.models.boxes.iou_calculator import bbox_overlaps_np
 from numpy import random as nprandom
 
 import mmcv
+@TRANSFORMS.register_module()
+class RRandomCrop:
+    def __init__(self,
+                 crop_size,
+                 crop_type='absolute',
+                 allow_negative_crop=False,
+                 version='oc'):
+        self.version = version
+        super(RRandomCrop, self).__init__()
+        if crop_type not in [
+                'relative_range', 'relative', 'absolute', 'absolute_range'
+        ]:
+            raise ValueError(f'Invalid crop_type {crop_type}.')
+        if crop_type in ['absolute', 'absolute_range']:
+            assert crop_size[0] > 0 and crop_size[1] > 0
+            assert isinstance(crop_size[0], int) and isinstance(
+                crop_size[1], int)
+        else:
+            assert 0 < crop_size[0] <= 1 and 0 < crop_size[1] <= 1
+        self.crop_size = crop_size
+        self.crop_type = crop_type
+        self.allow_negative_crop = allow_negative_crop
+        # The key correspondence from bboxes to labels and masks.
+        self.bbox2label = {
+            'gt_bboxes': 'gt_labels',
+            'gt_bboxes_ignore': 'gt_labels_ignore'
+        }
+
+    def filter_border(self, bboxes, h, w):
+        """Filter the box whose center point is outside or whose side length is
+        less than 5."""
+       
+        x_ctr, y_ctr = bboxes[:, 0], bboxes[:, 1]
+        w_bbox, h_bbox = bboxes[:, 2], bboxes[:, 3]
+        keep_inds = (x_ctr > 0) & (x_ctr < w) & (y_ctr > 0) & (y_ctr < h) & \
+                    (w_bbox > 5) & (h_bbox > 5)
+        return keep_inds
+
+    def _crop_data(self, img, annos, crop_size):
+        assert crop_size[0] > 0 and crop_size[1] > 0
+
+        margin_h = max(img.size[0] - crop_size[0], 0)
+        margin_w = max(img.size[1] - crop_size[1], 0)
+        offset_h = np.random.randint(0, margin_h + 1)
+        offset_w = np.random.randint(0, margin_w + 1)
+        crop_y1, crop_y2 = offset_h, offset_h + crop_size[0]
+        crop_x1, crop_x2 = offset_w, offset_w + crop_size[1]
+
+        # crop the image
+        img = np.array(img)
+        img = img[crop_y1:crop_y2, crop_x1:crop_x2, ...]
+        img_shape = img.shape[:2]
+        annos['img_size'] = img_shape
+
+        height, width = img_shape
+
+            # e.g. gt_bboxes and gt_bboxes_ignore
+        bbox_offset = np.array([offset_w, offset_h, 0, 0, 0],
+                                dtype=np.float32)
+        bboxes = annos['rboxes'] - bbox_offset
+
+        valid_inds = self.filter_border(bboxes,height, width)
+        # If the crop does not contain any gt-bbox area and
+        # allow_negative_crop is False, skip this image.
+        # annos['rboxes'] = bboxes[valid_inds]
+        polys = np.clip(rotated_box_to_poly_np(bboxes[valid_inds]), 0, 1023) 
+
+        annos['rboxes'] = poly_to_rotated_box_np(polys, 'le90')
+        annos['labels'] = annos['labels'][valid_inds]
+        if annos.__contains__('polys'):
+            poly_offset = np.array([offset_w, offset_h,offset_w, offset_h,offset_w, offset_h,offset_w, offset_h],
+                                dtype=np.float32)
+            annos['polys'] = polys
+        if annos.__contains__('polys'):
+            hbox_offset = np.array([offset_w, offset_h,0,0],
+                                dtype=np.float32)
+            annos['hboxes'] = annos['hboxes'][valid_inds] - hbox_offset
+     
+
+        return img, annos
+
+    def _get_crop_size(self, image_size):
+        """Randomly generates the absolute crop size based on `crop_type` and
+        `image_size`.
+        Args:
+            image_size (tuple): (h, w).
+        Returns:
+            crop_size (tuple): (crop_h, crop_w) in absolute pixels.
+        """
+        h, w = image_size
+        if self.crop_type == 'absolute':
+            return (min(self.crop_size[0], h), min(self.crop_size[1], w))
+        elif self.crop_type == 'absolute_range':
+            assert self.crop_size[0] <= self.crop_size[1]
+            crop_h = np.random.randint(
+                min(h, self.crop_size[0]),
+                min(h, self.crop_size[1]) + 1)
+            crop_w = np.random.randint(
+                min(w, self.crop_size[0]),
+                min(w, self.crop_size[1]) + 1)
+            return crop_h, crop_w
+        elif self.crop_type == 'relative':
+            crop_h, crop_w = self.crop_size
+            return int(h * crop_h + 0.5), int(w * crop_w + 0.5)
+        elif self.crop_type == 'relative_range':
+            crop_size = np.asarray(self.crop_size, dtype=np.float32)
+            crop_h, crop_w = crop_size + np.random.rand(2) * (1 - crop_size)
+            return int(h * crop_h + 0.5), int(w * crop_w + 0.5)
+
+    def __call__(self, img, annos):
+        """Call function to randomly crop images, bounding boxes, masks,
+        semantic segmentation maps.
+        Args:
+            results (dict): Result dict from loading pipeline.
+        Returns:
+            dict: Randomly cropped results, 'img_shape' key in result dict is
+                updated according to crop size.
+        """
+        o_img = img.copy()
+        o_annos = annos.copy()
+        image_size = img.size
+        crop_size = self._get_crop_size(image_size)
+        image, anno = self._crop_data(img, annos, crop_size)
+        if len(anno['labels']) == 0:
+            return o_img, o_annos
+        return Image.fromarray(image), anno
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(crop_size={self.crop_size}, '
+        repr_str += f'crop_type={self.crop_type}, '
+        repr_str += f'allow_negative_crop={self.allow_negative_crop}, '
+        return repr_str
+
+@TRANSFORMS.register_module()
+class RandmGrayScale:
+    def __init__(self, prob = 0.5) -> None:
+        self.prob = prob
+    
+    def is_convert_gray(self):
+        return np.random.rand() < self.prob
+
+    def __call__(self, img, annos):
+        if self.is_convert_gray():
+            img = img.convert('L')
+        
+            img = np.array(img)
+            img = Image.fromarray(np.stack((img,)*3, axis=-1))
+
+        return img, annos
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(gray_annos={self.annos}'
+        return repr_str
+
 
 @TRANSFORMS.register_module()
 class Compose:

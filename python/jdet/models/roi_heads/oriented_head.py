@@ -172,7 +172,9 @@ class OrientedHead(nn.Module):
         
         self._init_layers()
         self.init_weights()
-
+    @property
+    def custom_cls_channels(self):
+        return getattr(self.loss_cls, 'custom_cls_channels', False)
     def _add_conv_fc_branch(self, num_branch_convs,  num_branch_fcs, in_channels, is_shared=False):
         """Add shared or separable branch
 

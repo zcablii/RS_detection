@@ -48,5 +48,5 @@ data_analysis/*
 log*.txt
 *.npy
 res*
-projects
 configs
+zzz*
