@@ -1,35 +1,41 @@
+dataset_root = '/opt/data/private/LYX/data'
 # model settings
+num_classes = 10
 model = dict(
-    type='GlidingVertex',
+    type='OrientedRCNN',
     backbone=dict(
-        type='Resnet50',
-        frozen_stages=1,
-        return_stages=["layer1","layer2","layer3","layer4"],
+        type='swin_large',
+        img_size = 1024,
         pretrained= True),
     neck=dict(
         type='FPN',
-        in_channels=[256, 512, 1024, 2048],
+        in_channels=[192, 384, 768, 1536],
         out_channels=256,
         num_outs=5),
     rpn = dict(
-        type = "GlidingRPNHead",
-        in_channels = 256,
-        num_classes=2,
-        min_bbox_size = 0,
-        nms_thresh = 0.7,
-        nms_pre = 2000,
-        nms_post = 2000,
+        type = "OrientedRPNHead",
+        in_channels=256,
+        num_classes=1,
+        min_bbox_size=0,
+        nms_thresh=0.8,
+        nms_pre=4000,
+        nms_post=4000,
         feat_channels=256,
+        bbox_type='obb',
+        reg_dim=6,
+        background_label=0,
+        reg_decoded_bbox=False,
+        pos_weight=-1,
         anchor_generator=dict(
             type='AnchorGenerator',
             scales=[8],
-            ratios=[0.5, 1.0, 2.0],
+            ratios=[0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0],
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
-            type='GVDeltaXYWHBBoxCoder',
-            target_means=(.0, .0, .0, .0),
-            target_stds=(1.0, 1.0, 1.0, 1.0)),
-        loss_cls=dict(type='CrossEntropyLoss', loss_weight=1.0),
+            type='MidpointOffsetCoder',
+            target_means=[.0, .0, .0, .0, .0, .0],
+            target_stds=[1.0, 1.0, 1.0, 1.0, 0.5, 0.5]),
+        loss_cls=dict(type='CrossEntropyLossForRcnn', use_sigmoid=True, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
         assigner=dict(
             type='MaxIoUAssigner',
@@ -47,18 +53,14 @@ model = dict(
             neg_pos_ub=-1,
             add_gt_as_proposals=False)
     ),
+    
     bbox_head=dict(
-        type='GlidingHead',
-        num_classes=15,
+        type='OrientedEQLv2Head',
+        num_classes=num_classes,
         in_channels=256,
-        representation_dim = 1024,
-        pooler_resolution =  7, 
-        pooler_scales = [1/4.,1/8., 1/16., 1/32., 1/64.],
-        pooler_sampling_ratio = 0,
-        score_thresh=0.05,
-        nms_thresh=0.1,
-        detections_per_img=2000,
-        box_weights = (10., 10., 5., 5.),
+        fc_out_channels=1024,
+        score_thresh=0.01,
+        # score_thresh=0.001,
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
@@ -67,69 +69,65 @@ model = dict(
             ignore_iof_thr=-1,
             match_low_quality=False,
             assigned_labels_filled=-1,
-            iou_calculator=dict(type='BboxOverlaps2D')),
+            iou_calculator=dict(type='BboxOverlaps2D_rotated_v1')),
         sampler=dict(
-            type='RandomSampler',
+            type='RandomSamplerRotated',
             num=512,
             pos_fraction=0.25,
             neg_pos_ub=-1,
             add_gt_as_proposals=True),
         bbox_coder=dict(
-            type='GVDeltaXYWHBBoxCoder',
-            target_means=(.0, .0, .0, .0),
-            target_stds=(0.1, 0.1, 0.2, 0.2)),
-        fix_coder=dict(type='GVFixCoder'),
-        ratio_coder=dict(type='GVRatioCoder'),
+            type='OrientedDeltaXYWHTCoder',
+            target_means=[0., 0., 0., 0., 0.],
+            target_stds=[0.1, 0.1, 0.2, 0.2, 0.1]),
         bbox_roi_extractor=dict(
-            type='SingleRoIExtractor',
-            roi_layer=dict(type='ROIAlign', output_size=7, sampling_ratio=2, version=1),
+            type='OrientedSingleRoIExtractor',
+            roi_layer=dict(type='ROIAlignRotated_v1', output_size=7, sampling_ratio=2),
             out_channels=256,
+            extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
-        cls_loss=dict(
-            type='CrossEntropyLoss',
-            ),
-        bbox_loss=dict(
-            type='SmoothL1Loss', 
-            beta=1.0, 
+        loss_cls=dict(
+            type='EQLv2',
+            gamma=12,
+            mu=0.8,
+            alpha=4.0,
+            num_classes=num_classes),
+        loss_bbox=dict(
+            type='SmoothL1Loss',
+            beta=1.0,
             loss_weight=1.0
-            ),
-        fix_loss=dict(
-            type='SmoothL1Loss', 
-            beta=1.0 / 3.0, 
-            loss_weight=1.0,
-            ),
-        ratio_loss=dict(
-            type='SmoothL1Loss', 
-            beta=1.0 / 3.0, 
-            loss_weight=16.0
             ),
         with_bbox=True,
         with_shared_head=False,
-        start_bbox_type='hbb',
-        end_bbox_type='poly',
         with_avg_pool=False,
+        with_cls=True,
+        with_reg=True,
+        start_bbox_type='obb',
+        end_bbox_type='obb',
+        reg_dim=None,
+        reg_class_agnostic=True,
+        reg_decoded_bbox=False,
         pos_weight=-1,
-        reg_class_agnostic=False,
-        ratio_thr=0.8,
-        max_per_img=2000,
         )
     )
+    
+angle_version = 'le90'
 dataset = dict(
     train=dict(
-        type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        type="FAIR1M_1_5_Dataset",
+        dataset_dir=f'{dataset_root}/FAIR1M2.0_v2_extra_gray_color_preprocessed_ms/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
-                max_size=1024
+                max_size=1024,
+                angle_version = angle_version
             ),
-            dict(
-                type='RotatedRandomFlip', 
-                prob=0.5),
+            dict(type='RotatedRandomFlip', prob=0.5),
             dict(
                 type="RandomRotateAug",
                 random_rotate_on=True,
+                angle_version = angle_version
             ),
             dict(
                 type = "Pad",
@@ -138,23 +136,23 @@ dataset = dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True,)
+                to_bgr=False,)
             
         ],
-        batch_size=2,
-        num_workers=4,
+        batch_size=8,
+        num_workers=8,
         shuffle=True,
-        filter_empty_gt=False,
-        balance_category=True
+        filter_empty_gt=False
     ),
     val=dict(
-        type="DOTADataset",
-        dataset_dir='/home/cxjyxx_me/workspace/JAD/datasets/processed_DOTA/trainval_1024_200_1.0',
+        type="FAIR1M_1_5_Dataset",
+        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
-                max_size=1024
+                max_size=1024,
+                angle_version = angle_version
             ),
             dict(
                 type = "Pad",
@@ -165,47 +163,64 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False),
         ],
-        batch_size=2,
-        num_workers=4,
+        batch_size=16,
+        num_workers=8,
         shuffle=False
     ),
     test=dict(
         type="ImageDataset",
-        images_dir='/mnt/disk/lxl/dataset/DOTA_1024/test_split/images/',\
+        images_dir=f'{dataset_root}/test_2_preprocessed_ms/test_1024_200_0.5-1.0-1.5/images', # test_2_preprocessed_ms, testa_3_ms
         transforms=[
             dict(
                 type="RotatedResize",
                 min_size=1024,
-                max_size=1024
+                max_size=1024,
+                angle_version = angle_version
             ),
-            dict(   
+            dict(
                 type = "Pad",
                 size_divisor=32),
             dict(
                 type = "Normalize",
                 mean =  [123.675, 116.28, 103.53],
                 std = [58.395, 57.12, 57.375],
-                to_bgr=True,),
+                to_bgr=False,),
         ],
+        dataset_type="FAIR1M_1_5",
         num_workers=4,
         batch_size=1,
     )
 )
 
-optimizer = dict(type='SGD',  lr=0.005, momentum=0.9, weight_decay=0.0001, grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(type='AdamW',  lr=0.0001, weight_decay=0.05)
 
+# learning policy
 scheduler = dict(
     type='StepLR',
     warmup='linear',
     warmup_iters=500,
-    warmup_ratio=0.001,
+    warmup_ratio=1.0 / 3,
     milestones=[7, 10])
 
+
+optimizer_swa = dict(type='AdamW',  lr=0.0001, weight_decay=0.05)
+
+scheduler_swa = dict(
+    type='CosineAnnealingLR',
+    min_lr = 0.000001
+    )
 logger = dict(
     type="RunLogger")
 
 # when we the trained model from cshuan, image is rgb
-max_epoch = 12
-eval_interval = 1
+swa_start_epoch = 12
+
+max_epoch = 18
+eval_interval = 3
 checkpoint_interval = 1
-log_interval = 50
+log_interval = 5
+
+# resume_path = '/opt/data/private/LYX/RS_detection/work_dirs/orcnn_r152_fpn_1-2-4-8_anchor/checkpoints/swa_17-24.pkl'
+# model_only = True
+
+merge_nms_threshold_type = 1 
