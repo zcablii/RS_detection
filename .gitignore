@@ -47,6 +47,6 @@ tools/merge_results2.py
 data_analysis/*
 log*.txt
 *.npy
-res*
+res_*
 configs
 zzz*

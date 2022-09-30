@@ -36,7 +36,10 @@ def _cfg(url='', **kwargs):
 
 default_cfgs = {
     # patch models (my experiments)
-    
+    'swin_base_patch4_window12_384_in22k': _cfg(
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window12_384_22k.pth',
+        input_size=(3, 384, 384), crop_pct=1.0, num_classes=21841),
+        
     'swin_large_patch4_window12_384_in22k': _cfg(
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window12_384_22k.pth',
         input_size=(3, 384, 384), crop_pct=1.0, num_classes=21841),
@@ -542,3 +545,11 @@ def swin_large_patch4_window12_384_in22k(pretrained=False, **kwargs):
     model_kwargs = dict(
         patch_size=4, window_size=12, embed_dim=192, depths=(2, 2, 18, 2), num_heads=(6, 12, 24, 48), **kwargs)
     return _create_swin_transformer('swin_large_patch4_window12_384_in22k', pretrained=pretrained, **model_kwargs)
+
+@register_model
+def swin_base_patch4_window12_384_in22k(pretrained=False, **kwargs):
+    """ Swin-B @ 384x384, trained ImageNet-22k
+    """
+    model_kwargs = dict(
+        patch_size=4, window_size=12, embed_dim=128, depths=(2, 2, 18, 2), num_heads=(4, 8, 16, 32), **kwargs)
+    return _create_swin_transformer('swin_base_patch4_window12_384_in22k', pretrained=pretrained, **model_kwargs)

@@ -6,7 +6,7 @@ Original copyright of Ross Wightman below, modifications by VIP Group
 
 Hacked together by / copyright Ross Wightman
 """
-from jittor import nn
+from torch import nn as nn
 
 from .create_conv2d import create_conv2d
 from .create_norm_act import convert_norm_act
