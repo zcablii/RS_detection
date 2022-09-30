@@ -498,7 +498,7 @@ class SwinTransformer(nn.Module):
             x, x_middle = each_layer(x)
             B,A,C = x_middle.shape
             # print('middle: ',[B,A,C], 'X: ',x)
-            res.append(x_middle.transpose(0,2,1).view(B ,C,int(math.sqrt(A)),int(math.sqrt(A))))
+            res.append(x_middle.transpose(0,2,1).reshape(B ,C,int(math.sqrt(A)),int(math.sqrt(A))))
 
         # x = self.layers(x)
         # x = self.norm(x)  # B L C
