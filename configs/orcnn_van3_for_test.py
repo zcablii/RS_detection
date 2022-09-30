@@ -1,3 +1,5 @@
+# python tools/run_net.py --config-file configs/orcnn_van3_for_test.py  # use single GPU for test
+
 dataset_root = '/opt/data/private/LYX/data'
 # model settings
 num_classes = 10
@@ -8,7 +10,7 @@ model = dict(
         img_size=1024,
         num_stages=4,
         out_indices = (0, 1, 2, 3),
-        pretrained= True),
+        pretrained= False),  # for test, do not need to load pretrained backbone
     neck=dict(
         type='FPN',
         in_channels=[64, 128, 320, 512],
@@ -20,8 +22,8 @@ model = dict(
         num_classes=1,
         min_bbox_size=0,
         nms_thresh=0.8,
-        nms_pre=2000,
-        nms_post=2000,
+        nms_pre=4000, # change to 4000
+        nms_post=4000,
         feat_channels=256,
         bbox_type='obb',
         reg_dim=6,
@@ -61,8 +63,7 @@ model = dict(
         num_classes=num_classes,
         in_channels=256,
         fc_out_channels=1024,
-        score_thresh=0.01,
-        # score_thresh=0.001,
+        score_thresh=0.001, # test use lower score_thresh
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
@@ -171,7 +172,7 @@ dataset = dict(
     ),
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/test_2_preprocessed_ms/test_1024_200_0.5-1.0-1.5/images', # test_2_preprocessed_ms, testa_3_ms
+        images_dir=f'{dataset_root}/testa_3_ms/test_1024_200_0.5-1.0-1.5/images', #  testa_3_ms
         transforms=[
             dict(
                 type="RotatedResize",

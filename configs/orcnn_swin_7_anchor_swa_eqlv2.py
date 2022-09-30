@@ -18,8 +18,8 @@ model = dict(
         num_classes=1,
         min_bbox_size=0,
         nms_thresh=0.8,
-        nms_pre=4000,
-        nms_post=4000,
+        nms_pre=2000,
+        nms_post=2000,
         feat_channels=256,
         bbox_type='obb',
         reg_dim=6,
@@ -216,9 +216,9 @@ logger = dict(
 swa_start_epoch = 12
 
 max_epoch = 18
-eval_interval = 3
+eval_interval = 1
 checkpoint_interval = 1
-log_interval = 5
+log_interval = 100
 
 # resume_path = '/opt/data/private/LYX/RS_detection/work_dirs/orcnn_r152_fpn_1-2-4-8_anchor/checkpoints/swa_17-24.pkl'
 # model_only = True
