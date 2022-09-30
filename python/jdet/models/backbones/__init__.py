@@ -5,4 +5,6 @@ from .res2net import *
 from .convnext import *
 from .sk2res2net import *
 from .van import *
+from .swin import *
+from .jimm import *
 __all__ = []

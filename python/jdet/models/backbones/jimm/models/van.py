@@ -3,134 +3,15 @@ import jittor.nn as nn
 from jittor import init
 import math
 
-from jdet.utils.registry import BACKBONES
+from .registry import register_model
 from .layers import DropPath, to_2tuple, trunc_normal_
+from ..data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
-IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_DEFAULT_STD = (0.229, 0.224, 0.225)
-
-# ---------------------------------------------------------------------
-import errno
-import hashlib
-import os
-import re
-import shutil
-import sys
-import tempfile
-import warnings
-import zipfile
-from urllib.request import urlopen, Request
-from urllib.parse import urlparse
-from tqdm import tqdm
-
-HASH_REGEX = re.compile(r'-([a-f0-9]*)\.')
-
-def download_url_to_file(url, dst, hash_prefix=None, progress=True):
-    file_size = None
-    req = Request(url, headers={"User-Agent": "torch.hub"})
-    u = urlopen(req)
-    meta = u.info()
-    if hasattr(meta, 'getheaders'):
-        content_length = meta.getheaders("Content-Length")
-    else:
-        content_length = meta.get_all("Content-Length")
-    if content_length is not None and len(content_length) > 0:
-        file_size = int(content_length[0])
-
-    dst = os.path.expanduser(dst)
-    dst_dir = os.path.dirname(dst)
-    f = tempfile.NamedTemporaryFile(delete=False, dir=dst_dir)
-    try:
-        if hash_prefix is not None:
-            sha256 = hashlib.sha256()
-        with tqdm(total=file_size, disable=not progress,
-                  unit='B', unit_scale=True, unit_divisor=1024) as pbar:
-            while True:
-                buffer = u.read(8192)
-                if len(buffer) == 0:
-                    break
-                f.write(buffer)
-                if hash_prefix is not None:
-                    sha256.update(buffer)
-                pbar.update(len(buffer))
-        f.close()
-        if hash_prefix is not None:
-            digest = sha256.hexdigest()
-            if digest[:len(hash_prefix)] != hash_prefix:
-                raise RuntimeError('invalid hash value (expected "{}", got "{}")'
-                                   .format(hash_prefix, digest))
-        shutil.move(f.name, dst)
-    finally:
-        f.close()
-        if os.path.exists(f.name):
-            os.remove(f.name)
-
-def _is_legacy_zip_format(filename):
-    if zipfile.is_zipfile(filename):
-        infolist = zipfile.ZipFile(filename).infolist()
-        return len(infolist) == 1 and not infolist[0].is_dir()
-    return False
-
-def _legacy_zip_load(filename, model_dir, map_location):
-    with zipfile.ZipFile(filename) as f:
-        members = f.infolist()
-        if len(members) != 1:
-            raise RuntimeError('Only one file(not dir) is allowed in the zipfile')
-        f.extractall(model_dir)
-        extraced_name = members[0].filename
-        extracted_file = os.path.join(model_dir, extraced_name)
-    return jt.load(extracted_file)
-
-
-# def load_state_dict_from_url(url: str, model_dir = None, map_location = None, progress = True, check_hash = False, file_name = None):
-#     # Issue warning to move data if old env is set
-#     if os.getenv('TORCH_MODEL_ZOO'):
-#         warnings.warn('TORCH_MODEL_ZOO is deprecated, please use env TORCH_HOME instead')
-
-#     if model_dir is None:
-#         hub_dir = "/root/.cache/van/hub"
-#         model_dir = os.path.join(hub_dir, 'checkpoints')
-
-#     try:
-#         os.makedirs(model_dir)
-#     except OSError as e:
-#         if e.errno == errno.EEXIST:
-#             pass
-#         else:
-#             raise
-
-#     parts = urlparse(url)
-#     filename = os.path.basename(parts.path)
-#     if file_name is not None:
-#         filename = file_name
-#     cached_file = os.path.join(model_dir, filename)
-#     if not os.path.exists(cached_file):
-#         sys.stderr.write('Downloading: "{}" to {}\n'.format(url, cached_file))
-#         hash_prefix = None
-#         if check_hash:
-#             r = HASH_REGEX.search(filename)  # r is Optional[Match[str]]
-#             hash_prefix = r.group(1) if r else None
-#         download_url_to_file(url, cached_file, hash_prefix, progress=progress)
-
-#     if _is_legacy_zip_format(cached_file):
-#         return _legacy_zip_load(cached_file, model_dir, map_location)
-#     import torch
-#     return torch.load(cached_file)
-
-# ---------------------------------------------------------------------
-
-
-model_urls = {
-    "van_b0": "https://huggingface.co/Visual-Attention-Network/VAN-Tiny-original/resolve/main/van_tiny_754.pth.tar",
-    "van_b1": "https://huggingface.co/Visual-Attention-Network/VAN-Small-original/resolve/main/van_small_811.pth.tar",
-    "van_b2": "https://huggingface.co/Visual-Attention-Network/VAN-Base-original/resolve/main/van_base_828.pth.tar",
-    "van_b3": "https://huggingface.co/Visual-Attention-Network/VAN-Large-original/resolve/main/van_large_839.pth.tar",
-}
 
 def _cfg(url='', **kwargs):
     return {
         'url': url,
-        'num_classes': 10, 'input_size': (3, 1024, 1024), 'pool_size': None,
+        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
         'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
         'first_conv': 'patch_embed.proj', 'classifier': 'head',
@@ -174,6 +55,8 @@ class Mlp(nn.Module):
         x = self.fc2(x)
         x = self.drop(x)
         return x
+
+
 
 
 class AttentionModule(nn.Module):
@@ -227,12 +110,10 @@ class Block(nn.Module):
         #     layer_scale_init_value * jt.ones((dim)), requires_grad=True)
         # self.layer_scale_2 = nn.Parameter(
         #     layer_scale_init_value * jt.ones((dim)), requires_grad=True)
-        self.layer_scale_1 = layer_scale_init_value * jt.ones((dim))
-        self.layer_scale_2 = layer_scale_init_value * jt.ones((dim))
-        # self.layer_scale_1 = jt.start_grad(jt.Var(
-        #     layer_scale_init_value * jt.ones((dim))))
-        # self.layer_scale_2 = jt.start_grad(jt.Var(
-        #     layer_scale_init_value * jt.ones((dim))))
+        self.layer_scale_1 = jt.start_grad(jt.Var(
+            layer_scale_init_value * jt.ones((dim))))
+        self.layer_scale_2 = jt.start_grad(jt.Var(
+            layer_scale_init_value * jt.ones((dim))))
 
         self.apply(self._init_weights)
 
@@ -266,7 +147,7 @@ class OverlapPatchEmbed(nn.Module):
     """ Image to Patch Embedding
     """
 
-    def __init__(self, img_size=1024, patch_size=7, stride=4, in_chans=3, embed_dim=768):
+    def __init__(self, img_size=224, patch_size=7, stride=4, in_chans=3, embed_dim=768):
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -301,21 +182,21 @@ class OverlapPatchEmbed(nn.Module):
 
     def execute(self, x):
         x = self.proj(x)
-        # _, _, H, W = x.shape
+        _, _, H, W = x.shape
         x = self.norm(x)        
-        return x
+        return x, H, W
 
 
 class VAN(nn.Module):
-    def __init__(self, img_size=1024, in_chans=3, num_classes=10, embed_dims=[64, 128, 256, 512],
+    def __init__(self, img_size=224, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256, 512],
                 mlp_ratios=[4, 4, 4, 4], drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
-                 depths=[3, 4, 6, 3], num_stages=4, flag=False, out_indices = (0, 1, 2)):
+                 depths=[3, 4, 6, 3], num_stages=4, flag=False):
         super().__init__()
         if flag == False:
             self.num_classes = num_classes
         self.depths = depths
         self.num_stages = num_stages
-        self.out_indices = out_indices
+
         dpr = [x.item() for x in jt.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         cur = 0
 
@@ -337,7 +218,7 @@ class VAN(nn.Module):
             setattr(self, f"norm{i + 1}", norm)
 
         # classification head
-        # self.head = nn.Linear(embed_dims[3], num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(embed_dims[3], num_classes) if num_classes > 0 else nn.Identity()
 
         self.apply(self._init_weights)
 
@@ -374,26 +255,26 @@ class VAN(nn.Module):
 
     def forward_features(self, x):
         B = x.shape[0]
-        outs = []
+
         for i in range(self.num_stages):
             patch_embed = getattr(self, f"patch_embed{i + 1}")
             block = getattr(self, f"block{i + 1}")
             norm = getattr(self, f"norm{i + 1}")
-            x = patch_embed(x)
-            _, _, H, W = x.shape
+            x, H, W = patch_embed(x)
             for blk in block:
                 x = blk(x)
             # x = x.flatten(2).transpose(1, 2)
             x = jt.transpose(x.flatten(2),0,2,1)
             x = norm(x)
-            x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2)#.contiguous()
-            if i in self.out_indices:
-                outs.append(x)
-        return outs
+            if i != self.num_stages - 1:
+                x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2)#.contiguous()
+
+        return x.mean(dim=1)
 
     def execute(self, x):
         x = self.forward_features(x)
-        # x = self.head(x)
+        x = self.head(x)
+
         return x
 
 
@@ -417,67 +298,46 @@ def _conv_filter(state_dict, patch_size=16):
 
     return out_dict
 
-from torch.hub import load_state_dict_from_url
-def load_param(url, model):
-    checkpoint = load_state_dict_from_url(
-        url=url, map_location="cpu", check_hash=True
-    )
-    del checkpoint["state_dict"]["head.weight"]
-    del checkpoint["state_dict"]["head.bias"]
-    model.load_state_dict(checkpoint["state_dict"])
-    return model
 
-@BACKBONES.register_module()
-def van_b0(pretrained=False, **kwargs):
+@register_model
+def van_tiny(pretrained=False, **kwargs):
     model = VAN(
         embed_dims=[32, 64, 160, 256], mlp_ratios=[8, 8, 4, 4], 
         norm_layer=nn.LayerNorm, depths=[3, 3, 5, 2],
         **kwargs)
     model.default_cfg = _cfg()
 
-    if pretrained:
-        model.load_state_dict
-        model = load_param(model_urls['van_b0'], model)
     return model
 
 
-@BACKBONES.register_module()
-def van_b1(pretrained=False, **kwargs):
+@register_model
+def van_small(pretrained=False, **kwargs):
     model = VAN(
         embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4],
         norm_layer=nn.LayerNorm, depths=[2, 2, 4, 2],
         **kwargs)
     model.default_cfg = _cfg()
 
-    if pretrained:
-        model.load_state_dict
-        model = load_param(model_urls['van_b1'], model)
     return model
 
-@BACKBONES.register_module()
-def van_b2(pretrained=False, **kwargs):
+@register_model
+def van_base(pretrained=False, **kwargs):
     model = VAN(
         embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4], 
         norm_layer=nn.LayerNorm, depths=[3, 3, 12, 3], 
         **kwargs)
     model.default_cfg = _cfg()
 
-    if pretrained:
-        model.load_state_dict
-        model = load_param(model_urls['van_b2'], model)
     return model
 
-@BACKBONES.register_module()
-def van_b3(pretrained=False, **kwargs):
+@register_model
+def van_large(pretrained=False, **kwargs):
     model = VAN(
         embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4], 
         norm_layer=nn.LayerNorm, depths=[3, 5, 27, 3], 
         **kwargs)
     model.default_cfg = _cfg()
 
-    if pretrained:
-        model.load_state_dict
-        model = load_param(model_urls['van_b3'], model)
     return model
 
 
