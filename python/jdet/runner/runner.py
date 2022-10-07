@@ -243,10 +243,10 @@ class Runner:
             if (self.cfg.dataset.test.type == "ImageDataset"):
                 dataset_type = self.test_dataset.dataset_type
                 data_merge_result(save_file,self.work_dir,self.epoch,self.cfg.name+'_epoch'+str(self.epoch),dataset_type,self.cfg.dataset.test.images_dir)
-                import sys
-                sys.path.append(os.path.join(os.getcwd(), "tools"))
-                from val import evaluate_in_training
-                evaluate_in_training(os.path.join(os.getcwd(),"submit_zips", self.work_dir.split(os.path.sep)[-1]+"_epoch"+str(self.epoch)+".csv"), self.iter, self.logger)
+                # import sys
+                # sys.path.append(os.path.join(os.getcwd(), "tools"))
+                # from val import evaluate_in_training
+                # evaluate_in_training(os.path.join(os.getcwd(),"submit_zips", self.work_dir.split(os.path.sep)[-1]+"_epoch"+str(self.epoch)+".csv"), self.iter, self.logger)
 
     @jt.single_process_scope()
     def save(self):

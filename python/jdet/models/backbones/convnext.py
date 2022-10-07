@@ -91,6 +91,10 @@ class ConvNeXt(nn.Module):
         self.apply(self._init_weights)
         self.norm_eval = norm_eval 
         self.frozen_stages = frozen_stages
+        for i in range(dims):
+            norm = LayerNorm(dims[i], data_format='channels_first')
+            setattr(self, f"norm{i}", norm)
+
         # self.head.weight.data = self.head.weight.data.multiply(head_init_scale)
         # self.head.bias.data = self.head.bias.data.multiply(head_init_scale)
 
@@ -105,7 +109,8 @@ class ConvNeXt(nn.Module):
             x = self.downsample_layers[i](x)
             x = self.stages[i](x)
             if i+1 in self.return_stages:
-                output.append(x)
+                norm = getattr(self, f"norm{i}")
+                output.append(norm(x))
         return tuple(output) #  self.norm(x.mean([(- 2), (- 1)]))
 
     def execute(self, x):

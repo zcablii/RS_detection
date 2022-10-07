@@ -9,140 +9,160 @@ from jdet.models.boxes.box_ops import rotated_box_to_poly_np,poly_to_rotated_box
 from jdet.models.boxes.iou_calculator import bbox_overlaps_np
 from numpy import random as nprandom
 
-import mmcv
+# import mmcv
+
+import skimage
 @TRANSFORMS.register_module()
-class RRandomCrop:
-    def __init__(self,
-                 crop_size,
-                 crop_type='absolute',
-                 allow_negative_crop=False,
-                 version='oc'):
-        self.version = version
-        super(RRandomCrop, self).__init__()
-        if crop_type not in [
-                'relative_range', 'relative', 'absolute', 'absolute_range'
-        ]:
-            raise ValueError(f'Invalid crop_type {crop_type}.')
-        if crop_type in ['absolute', 'absolute_range']:
-            assert crop_size[0] > 0 and crop_size[1] > 0
-            assert isinstance(crop_size[0], int) and isinstance(
-                crop_size[1], int)
-        else:
-            assert 0 < crop_size[0] <= 1 and 0 < crop_size[1] <= 1
-        self.crop_size = crop_size
-        self.crop_type = crop_type
-        self.allow_negative_crop = allow_negative_crop
-        # The key correspondence from bboxes to labels and masks.
-        self.bbox2label = {
-            'gt_bboxes': 'gt_labels',
-            'gt_bboxes_ignore': 'gt_labels_ignore'
-        }
-
-    def filter_border(self, bboxes, h, w):
-        """Filter the box whose center point is outside or whose side length is
-        less than 5."""
-       
-        x_ctr, y_ctr = bboxes[:, 0], bboxes[:, 1]
-        w_bbox, h_bbox = bboxes[:, 2], bboxes[:, 3]
-        keep_inds = (x_ctr > 0) & (x_ctr < w) & (y_ctr > 0) & (y_ctr < h) & \
-                    (w_bbox > 5) & (h_bbox > 5)
-        return keep_inds
-
-    def _crop_data(self, img, annos, crop_size):
-        assert crop_size[0] > 0 and crop_size[1] > 0
-
-        margin_h = max(img.size[0] - crop_size[0], 0)
-        margin_w = max(img.size[1] - crop_size[1], 0)
-        offset_h = np.random.randint(0, margin_h + 1)
-        offset_w = np.random.randint(0, margin_w + 1)
-        crop_y1, crop_y2 = offset_h, offset_h + crop_size[0]
-        crop_x1, crop_x2 = offset_w, offset_w + crop_size[1]
-
-        # crop the image
-        img = np.array(img)
-        img = img[crop_y1:crop_y2, crop_x1:crop_x2, ...]
-        img_shape = img.shape[:2]
-        annos['img_size'] = img_shape
-
-        height, width = img_shape
-
-            # e.g. gt_bboxes and gt_bboxes_ignore
-        bbox_offset = np.array([offset_w, offset_h, 0, 0, 0],
-                                dtype=np.float32)
-        bboxes = annos['rboxes'] - bbox_offset
-
-        valid_inds = self.filter_border(bboxes,height, width)
-        # If the crop does not contain any gt-bbox area and
-        # allow_negative_crop is False, skip this image.
-        # annos['rboxes'] = bboxes[valid_inds]
-        polys = np.clip(rotated_box_to_poly_np(bboxes[valid_inds]), 0, 1023) 
-
-        annos['rboxes'] = poly_to_rotated_box_np(polys, 'le90')
-        annos['labels'] = annos['labels'][valid_inds]
-        if annos.__contains__('polys'):
-            poly_offset = np.array([offset_w, offset_h,offset_w, offset_h,offset_w, offset_h,offset_w, offset_h],
-                                dtype=np.float32)
-            annos['polys'] = polys
-        if annos.__contains__('polys'):
-            hbox_offset = np.array([offset_w, offset_h,0,0],
-                                dtype=np.float32)
-            annos['hboxes'] = annos['hboxes'][valid_inds] - hbox_offset
-     
-
-        return img, annos
-
-    def _get_crop_size(self, image_size):
-        """Randomly generates the absolute crop size based on `crop_type` and
-        `image_size`.
-        Args:
-            image_size (tuple): (h, w).
-        Returns:
-            crop_size (tuple): (crop_h, crop_w) in absolute pixels.
-        """
-        h, w = image_size
-        if self.crop_type == 'absolute':
-            return (min(self.crop_size[0], h), min(self.crop_size[1], w))
-        elif self.crop_type == 'absolute_range':
-            assert self.crop_size[0] <= self.crop_size[1]
-            crop_h = np.random.randint(
-                min(h, self.crop_size[0]),
-                min(h, self.crop_size[1]) + 1)
-            crop_w = np.random.randint(
-                min(w, self.crop_size[0]),
-                min(w, self.crop_size[1]) + 1)
-            return crop_h, crop_w
-        elif self.crop_type == 'relative':
-            crop_h, crop_w = self.crop_size
-            return int(h * crop_h + 0.5), int(w * crop_w + 0.5)
-        elif self.crop_type == 'relative_range':
-            crop_size = np.asarray(self.crop_size, dtype=np.float32)
-            crop_h, crop_w = crop_size + np.random.rand(2) * (1 - crop_size)
-            return int(h * crop_h + 0.5), int(w * crop_w + 0.5)
-
+class RandmNoise:
+    def __init__(self) -> None:
+        pass
     def __call__(self, img, annos):
-        """Call function to randomly crop images, bounding boxes, masks,
-        semantic segmentation maps.
-        Args:
-            results (dict): Result dict from loading pipeline.
-        Returns:
-            dict: Randomly cropped results, 'img_shape' key in result dict is
-                updated according to crop size.
-        """
-        o_img = img.copy()
-        o_annos = annos.copy()
-        image_size = img.size
-        crop_size = self._get_crop_size(image_size)
-        image, anno = self._crop_data(img, annos, crop_size)
-        if len(anno['labels']) == 0:
-            return o_img, o_annos
-        return Image.fromarray(image), anno
+        img = skimage.img_as_float(img)
+        # var = random.uniform(0.0001, 0.04)
+        img = skimage.util.random_noise(img,mode='gaussian',var=0.01)
+        img = skimage.img_as_ubyte(img)
+        img = Image.fromarray(np.array(img))
+        return img, annos
 
     def __repr__(self):
         repr_str = self.__class__.__name__
-        repr_str += f'(crop_size={self.crop_size}, '
-        repr_str += f'crop_type={self.crop_type}, '
-        repr_str += f'allow_negative_crop={self.allow_negative_crop}, '
+        repr_str += f'(gray_annos={self.annos}'
         return repr_str
+
+
+# @TRANSFORMS.register_module()
+# class RRandomCrop:
+#     def __init__(self,
+#                  crop_size,
+#                  crop_type='absolute',
+#                  allow_negative_crop=False,
+#                  version='oc'):
+#         self.version = version
+#         super(RRandomCrop, self).__init__()
+#         if crop_type not in [
+#                 'relative_range', 'relative', 'absolute', 'absolute_range'
+#         ]:
+#             raise ValueError(f'Invalid crop_type {crop_type}.')
+#         if crop_type in ['absolute', 'absolute_range']:
+#             assert crop_size[0] > 0 and crop_size[1] > 0
+#             assert isinstance(crop_size[0], int) and isinstance(
+#                 crop_size[1], int)
+#         else:
+#             assert 0 < crop_size[0] <= 1 and 0 < crop_size[1] <= 1
+#         self.crop_size = crop_size
+#         self.crop_type = crop_type
+#         self.allow_negative_crop = allow_negative_crop
+#         # The key correspondence from bboxes to labels and masks.
+#         self.bbox2label = {
+#             'gt_bboxes': 'gt_labels',
+#             'gt_bboxes_ignore': 'gt_labels_ignore'
+#         }
+
+#     def filter_border(self, bboxes, h, w):
+#         """Filter the box whose center point is outside or whose side length is
+#         less than 5."""
+       
+#         x_ctr, y_ctr = bboxes[:, 0], bboxes[:, 1]
+#         w_bbox, h_bbox = bboxes[:, 2], bboxes[:, 3]
+#         keep_inds = (x_ctr > 0) & (x_ctr < w) & (y_ctr > 0) & (y_ctr < h) & \
+#                     (w_bbox > 5) & (h_bbox > 5)
+#         return keep_inds
+
+#     def _crop_data(self, img, annos, crop_size):
+#         assert crop_size[0] > 0 and crop_size[1] > 0
+
+#         margin_h = max(img.size[0] - crop_size[0], 0)
+#         margin_w = max(img.size[1] - crop_size[1], 0)
+#         offset_h = np.random.randint(0, margin_h + 1)
+#         offset_w = np.random.randint(0, margin_w + 1)
+#         crop_y1, crop_y2 = offset_h, offset_h + crop_size[0]
+#         crop_x1, crop_x2 = offset_w, offset_w + crop_size[1]
+
+#         # crop the image
+#         img = np.array(img)
+#         img = img[crop_y1:crop_y2, crop_x1:crop_x2, ...]
+#         img_shape = img.shape[:2]
+#         annos['img_size'] = img_shape
+
+#         height, width = img_shape
+
+#             # e.g. gt_bboxes and gt_bboxes_ignore
+#         bbox_offset = np.array([offset_w, offset_h, 0, 0, 0],
+#                                 dtype=np.float32)
+#         bboxes = annos['rboxes'] - bbox_offset
+
+#         valid_inds = self.filter_border(bboxes,height, width)
+#         # If the crop does not contain any gt-bbox area and
+#         # allow_negative_crop is False, skip this image.
+#         # annos['rboxes'] = bboxes[valid_inds]
+#         polys = np.clip(rotated_box_to_poly_np(bboxes[valid_inds]), 0, 1023) 
+
+#         annos['rboxes'] = poly_to_rotated_box_np(polys, 'le90')
+#         annos['labels'] = annos['labels'][valid_inds]
+#         if annos.__contains__('polys'):
+#             poly_offset = np.array([offset_w, offset_h,offset_w, offset_h,offset_w, offset_h,offset_w, offset_h],
+#                                 dtype=np.float32)
+#             annos['polys'] = polys
+#         if annos.__contains__('polys'):
+#             hbox_offset = np.array([offset_w, offset_h,0,0],
+#                                 dtype=np.float32)
+#             annos['hboxes'] = annos['hboxes'][valid_inds] - hbox_offset
+     
+
+#         return img, annos
+
+#     def _get_crop_size(self, image_size):
+#         """Randomly generates the absolute crop size based on `crop_type` and
+#         `image_size`.
+#         Args:
+#             image_size (tuple): (h, w).
+#         Returns:
+#             crop_size (tuple): (crop_h, crop_w) in absolute pixels.
+#         """
+#         h, w = image_size
+#         if self.crop_type == 'absolute':
+#             return (min(self.crop_size[0], h), min(self.crop_size[1], w))
+#         elif self.crop_type == 'absolute_range':
+#             assert self.crop_size[0] <= self.crop_size[1]
+#             crop_h = np.random.randint(
+#                 min(h, self.crop_size[0]),
+#                 min(h, self.crop_size[1]) + 1)
+#             crop_w = np.random.randint(
+#                 min(w, self.crop_size[0]),
+#                 min(w, self.crop_size[1]) + 1)
+#             return crop_h, crop_w
+#         elif self.crop_type == 'relative':
+#             crop_h, crop_w = self.crop_size
+#             return int(h * crop_h + 0.5), int(w * crop_w + 0.5)
+#         elif self.crop_type == 'relative_range':
+#             crop_size = np.asarray(self.crop_size, dtype=np.float32)
+#             crop_h, crop_w = crop_size + np.random.rand(2) * (1 - crop_size)
+#             return int(h * crop_h + 0.5), int(w * crop_w + 0.5)
+
+#     def __call__(self, img, annos):
+#         """Call function to randomly crop images, bounding boxes, masks,
+#         semantic segmentation maps.
+#         Args:
+#             results (dict): Result dict from loading pipeline.
+#         Returns:
+#             dict: Randomly cropped results, 'img_shape' key in result dict is
+#                 updated according to crop size.
+#         """
+#         o_img = img.copy()
+#         o_annos = annos.copy()
+#         image_size = img.size
+#         crop_size = self._get_crop_size(image_size)
+#         image, anno = self._crop_data(img, annos, crop_size)
+#         if len(anno['labels']) == 0:
+#             return o_img, o_annos
+#         return Image.fromarray(image), anno
+
+#     def __repr__(self):
+#         repr_str = self.__class__.__name__
+#         repr_str += f'(crop_size={self.crop_size}, '
+#         repr_str += f'crop_type={self.crop_type}, '
+#         repr_str += f'allow_negative_crop={self.allow_negative_crop}, '
+#         return repr_str
 
 @TRANSFORMS.register_module()
 class RandmGrayScale:
@@ -236,153 +256,153 @@ class RandomRotateAug:
         return image, target
 
 
-@TRANSFORMS.register_module()
-class PolyRandomRotate(object):
+# @TRANSFORMS.register_module()
+# class PolyRandomRotate(object):
 
-    def __init__(self,
-                 rotate_ratio=0.5,
-                 mode='range',
-                 angles_range=180,
-                 auto_bound=False,
-                 angle_version='le90'):
-        self.rotate_ratio = rotate_ratio
-        self.auto_bound = auto_bound
-        assert mode in ['range', 'value'], \
-            f"mode is supposed to be 'range' or 'value', but got {mode}."
-        if mode == 'range':
-            assert isinstance(angles_range, int), \
-                "mode 'range' expects angle_range to be an int."
-        else:
-            assert mmcv.is_seq_of(angles_range, int) and len(angles_range), \
-                "mode 'value' expects angle_range as a non-empty list of int."
-        self.mode = mode
-        self.angles_range = angles_range
-        self.discrete_range = [90, 180, -90, -180]
-        self.version = angle_version
+#     def __init__(self,
+#                  rotate_ratio=0.5,
+#                  mode='range',
+#                  angles_range=180,
+#                  auto_bound=False,
+#                  angle_version='le90'):
+#         self.rotate_ratio = rotate_ratio
+#         self.auto_bound = auto_bound
+#         assert mode in ['range', 'value'], \
+#             f"mode is supposed to be 'range' or 'value', but got {mode}."
+#         if mode == 'range':
+#             assert isinstance(angles_range, int), \
+#                 "mode 'range' expects angle_range to be an int."
+#         else:
+#             assert mmcv.is_seq_of(angles_range, int) and len(angles_range), \
+#                 "mode 'value' expects angle_range as a non-empty list of int."
+#         self.mode = mode
+#         self.angles_range = angles_range
+#         self.discrete_range = [90, 180, -90, -180]
+#         self.version = angle_version
 
-    @property
-    def is_rotate(self):
-        """Randomly decide whether to rotate."""
-        return np.random.rand() < self.rotate_ratio
+#     @property
+#     def is_rotate(self):
+#         """Randomly decide whether to rotate."""
+#         return np.random.rand() < self.rotate_ratio
 
-    def apply_image(self, img, bound_h, bound_w, interp=cv2.INTER_LINEAR):
-        """
-        img should be a numpy array, formatted as Height * Width * Nchannels
-        """
-        if len(img) == 0:
-            return img
-        return cv2.warpAffine(
-            img, self.rm_image, (bound_w, bound_h), flags=interp)
+#     def apply_image(self, img, bound_h, bound_w, interp=cv2.INTER_LINEAR):
+#         """
+#         img should be a numpy array, formatted as Height * Width * Nchannels
+#         """
+#         if len(img) == 0:
+#             return img
+#         return cv2.warpAffine(
+#             img, self.rm_image, (bound_w, bound_h), flags=interp)
 
-    def apply_coords(self, coords):
-        """
-        coords should be a N * 2 array-like, containing N couples of (x, y)
-        points
-        """
-        if len(coords) == 0:
-            return coords
-        coords = np.asarray(coords, dtype=float)
-        return cv2.transform(coords[:, np.newaxis, :], self.rm_coords)[:, 0, :]
+#     def apply_coords(self, coords):
+#         """
+#         coords should be a N * 2 array-like, containing N couples of (x, y)
+#         points
+#         """
+#         if len(coords) == 0:
+#             return coords
+#         coords = np.asarray(coords, dtype=float)
+#         return cv2.transform(coords[:, np.newaxis, :], self.rm_coords)[:, 0, :]
 
-    def create_rotation_matrix(self,
-                               center,
-                               angle,
-                               bound_h,
-                               bound_w,
-                               offset=0):
-        """Create rotation matrix."""
-        center += offset
-        rm = cv2.getRotationMatrix2D(tuple(center), angle, 1)
-        if self.auto_bound:
-            rot_im_center = cv2.transform(center[None, None, :] + offset,
-                                          rm)[0, 0, :]
-            new_center = np.array([bound_w / 2, bound_h / 2
-                                   ]) + offset - rot_im_center
-            rm[:, 2] += new_center
-        return rm
+#     def create_rotation_matrix(self,
+#                                center,
+#                                angle,
+#                                bound_h,
+#                                bound_w,
+#                                offset=0):
+#         """Create rotation matrix."""
+#         center += offset
+#         rm = cv2.getRotationMatrix2D(tuple(center), angle, 1)
+#         if self.auto_bound:
+#             rot_im_center = cv2.transform(center[None, None, :] + offset,
+#                                           rm)[0, 0, :]
+#             new_center = np.array([bound_w / 2, bound_h / 2
+#                                    ]) + offset - rot_im_center
+#             rm[:, 2] += new_center
+#         return rm
 
-    def filter_border(self, bboxes, h, w):
-        """Filter the box whose center point is outside or whose side length is
-        less than 5."""
+#     def filter_border(self, bboxes, h, w):
+#         """Filter the box whose center point is outside or whose side length is
+#         less than 5."""
        
-        x_ctr, y_ctr = bboxes[:, 0], bboxes[:, 1]
-        w_bbox, h_bbox = bboxes[:, 2], bboxes[:, 3]
-        keep_inds = (x_ctr > 0) & (x_ctr < w) & (y_ctr > 0) & (y_ctr < h) & \
-                    (w_bbox > 5) & (h_bbox > 5)
-        return keep_inds
+#         x_ctr, y_ctr = bboxes[:, 0], bboxes[:, 1]
+#         w_bbox, h_bbox = bboxes[:, 2], bboxes[:, 3]
+#         keep_inds = (x_ctr > 0) & (x_ctr < w) & (y_ctr > 0) & (y_ctr < h) & \
+#                     (w_bbox > 5) & (h_bbox > 5)
+#         return keep_inds
 
-    def __call__(self, image, target=None ):
-        """Call function of PolyRandomRotate."""
-        o_img = image.copy()
-        o_target = target.copy()
-        h, w = image.size
-        image = np.array(image, dtype=np.uint8)
-        if not self.is_rotate:
-            angle = 0
-        else:
-            if self.mode == 'range':
-                angle = self.angles_range * (2 * np.random.rand() - 1)
-            else:
-                i = np.random.randint(len(self.angles_range))
-                angle = self.angles_range[i]
+#     def __call__(self, image, target=None ):
+#         """Call function of PolyRandomRotate."""
+#         o_img = image.copy()
+#         o_target = target.copy()
+#         h, w = image.size
+#         image = np.array(image, dtype=np.uint8)
+#         if not self.is_rotate:
+#             angle = 0
+#         else:
+#             if self.mode == 'range':
+#                 angle = self.angles_range * (2 * np.random.rand() - 1)
+#             else:
+#                 i = np.random.randint(len(self.angles_range))
+#                 angle = self.angles_range[i]
 
-        target['rotate_angle'] = angle
+#         target['rotate_angle'] = angle
 
-        image_center = np.array((w / 2, h / 2))
-        abs_cos, abs_sin = \
-            abs(np.cos(angle / 180 * np.pi)), abs(np.sin(angle / 180 * np.pi))
-        if self.auto_bound:
-            bound_w, bound_h = np.rint(
-                [h * abs_sin + w * abs_cos,
-                 h * abs_cos + w * abs_sin]).astype(int)
-        else:
-            bound_w, bound_h = w, h
+#         image_center = np.array((w / 2, h / 2))
+#         abs_cos, abs_sin = \
+#             abs(np.cos(angle / 180 * np.pi)), abs(np.sin(angle / 180 * np.pi))
+#         if self.auto_bound:
+#             bound_w, bound_h = np.rint(
+#                 [h * abs_sin + w * abs_cos,
+#                  h * abs_cos + w * abs_sin]).astype(int)
+#         else:
+#             bound_w, bound_h = w, h
 
-        self.rm_coords = self.create_rotation_matrix(image_center, angle,
-                                                     bound_h, bound_w)
-        self.rm_image = self.create_rotation_matrix(
-            image_center, angle, bound_h, bound_w, offset=-0.5)
+#         self.rm_coords = self.create_rotation_matrix(image_center, angle,
+#                                                      bound_h, bound_w)
+#         self.rm_image = self.create_rotation_matrix(
+#             image_center, angle, bound_h, bound_w, offset=-0.5)
 
-        image = self.apply_image(image, bound_h, bound_w)
-        target['img_size'] = (bound_h, bound_w)
-        gt_bboxes = target.get('rboxes', [])
-        labels = target.get('labels', [])
-        polys = rotated_box_to_poly_np(gt_bboxes).reshape(-1, 2)
-        polys = self.apply_coords(polys).reshape(-1, 8)
-        gt_bboxes = poly_to_rotated_box_np(polys,self.version) \
+#         image = self.apply_image(image, bound_h, bound_w)
+#         target['img_size'] = (bound_h, bound_w)
+#         gt_bboxes = target.get('rboxes', [])
+#         labels = target.get('labels', [])
+#         polys = rotated_box_to_poly_np(gt_bboxes).reshape(-1, 2)
+#         polys = self.apply_coords(polys).reshape(-1, 8)
+#         gt_bboxes = poly_to_rotated_box_np(polys,self.version) \
                 
-        gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
-        keep_inds = self.filter_border(gt_bboxes, bound_h, bound_w)
-        gt_bboxes = gt_bboxes[keep_inds, :]
-        polys = polys[keep_inds]
-        max_xy = polys.reshape(-1,4,2).max(axis=1)
-        min_xy = polys.reshape(-1,4,2).min(axis=1)
-        # print(polys,max_xy, min_xy)
-        res_hbox = []
-        for each in zip(max_xy, min_xy):
-            x,y = (each[0]+each[1])/2
-            h,w = each[0]-each[1]
-            res_hbox.append([x,y,h,w])
+#         gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
+#         keep_inds = self.filter_border(gt_bboxes, bound_h, bound_w)
+#         gt_bboxes = gt_bboxes[keep_inds, :]
+#         polys = polys[keep_inds]
+#         max_xy = polys.reshape(-1,4,2).max(axis=1)
+#         min_xy = polys.reshape(-1,4,2).min(axis=1)
+#         # print(polys,max_xy, min_xy)
+#         res_hbox = []
+#         for each in zip(max_xy, min_xy):
+#             x,y = (each[0]+each[1])/2
+#             h,w = each[0]-each[1]
+#             res_hbox.append([x,y,h,w])
      
-        hbox = np.array(res_hbox).astype(np.float32)
+#         hbox = np.array(res_hbox).astype(np.float32)
         
-        labels = labels[keep_inds]
+#         labels = labels[keep_inds]
         
-        target['rboxes'] = gt_bboxes
-        target['labels'] = labels
-        target['polys'] = polys
-        target['hboxes'] = hbox
-        # print("Image.fromarray(image) , target",Image.fromarray(image) , target)
-        if len(labels) == 0:
-            return o_img, o_target
-        return Image.fromarray(image) , target
+#         target['rboxes'] = gt_bboxes
+#         target['labels'] = labels
+#         target['polys'] = polys
+#         target['hboxes'] = hbox
+#         # print("Image.fromarray(image) , target",Image.fromarray(image) , target)
+#         if len(labels) == 0:
+#             return o_img, o_target
+#         return Image.fromarray(image) , target
 
-    def __repr__(self):
-        repr_str = self.__class__.__name__
-        repr_str += f'(rotate_ratio={self.rotate_ratio}, ' \
-                    f'angles_range={self.angles_range}, ' \
-                    f'auto_bound={self.auto_bound})'
-        return repr_str
+#     def __repr__(self):
+#         repr_str = self.__class__.__name__
+#         repr_str += f'(rotate_ratio={self.rotate_ratio}, ' \
+#                     f'angles_range={self.angles_range}, ' \
+#                     f'auto_bound={self.auto_bound})'
+#         return repr_str
 
 
 @TRANSFORMS.register_module()

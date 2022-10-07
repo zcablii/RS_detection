@@ -8,7 +8,7 @@ import glob
 from typing import Union
 import pandas as pd
 sys.path.append("/opt/data/private/github_push/RS_detection/tools")
-from val import test_evaluate
+# from val import test_evaluate
 
 FAIR1M_1_5_CLASSES = ['Airplane', 'Ship', 'Vehicle', 'Basketball_Court', 'Tennis_Court', 
         "Football_Field", "Baseball_Field", 'Intersection', 'Roundabout', 'Bridge']
@@ -185,35 +185,35 @@ def judge_exist(path_list):
     for each_path in path_list:
         assert os.path.exists(each_path),  "file {} not exits".format(each_path)
 
-def meshgrid_find_param(thresh_dict, data_list):
-    """
-    根据测试数据对参数进行调节(nms)
-    """
-    for k, _ in thresh_dict.items():
-        best_thresh = 0
-        max_value = 0
-        for thresh in np.linspace(0,1,21):
-            thresh_dict[k] = thresh
-            data = merge_csv_with_class(data_list, thresh_dict)
-            result = test_evaluate(data)
-            if result[k + "_AP"] > max_value:
-                max_value = result[k + "_AP"]
-                best_thresh = thresh
-        thresh_dict[k] = best_thresh
-    return thresh_dict
+# def meshgrid_find_param(thresh_dict, data_list):
+#     """
+#     根据测试数据对参数进行调节(nms)
+#     """
+#     for k, _ in thresh_dict.items():
+#         best_thresh = 0
+#         max_value = 0
+#         for thresh in np.linspace(0,1,21):
+#             thresh_dict[k] = thresh
+#             data = merge_csv_with_class(data_list, thresh_dict)
+#             result = test_evaluate(data)
+#             if result[k + "_AP"] > max_value:
+#                 max_value = result[k + "_AP"]
+#                 best_thresh = thresh
+#         thresh_dict[k] = best_thresh
+#     return thresh_dict
 
-def soft_nms_find_param(data_list):
-    best_param = [0, 0]
-    max_map = 0
-    for thresh in np.linspace(0,1,11):
-        for Nt in np.linspace(0,1,11):
-            data = merge_csv_with_class(data_list, 0, [thresh, Nt])
-            result = test_evaluate(data)
-            print(max_map, result["meanAP"])
-            if result["meanAP"] > max_map:
-                max_map = result["meanAP"]
-                best_param = [thresh, Nt]
-    print(f"find best param thresh = {best_param[0]}, Nt = {best_param[1]}, max_map = {max_map}")
+# def soft_nms_find_param(data_list):
+#     best_param = [0, 0]
+#     max_map = 0
+#     for thresh in np.linspace(0,1,11):
+#         for Nt in np.linspace(0,1,11):
+#             data = merge_csv_with_class(data_list, 0, [thresh, Nt])
+#             result = test_evaluate(data)
+#             print(max_map, result["meanAP"])
+#             if result["meanAP"] > max_map:
+#                 max_map = result["meanAP"]
+#                 best_param = [thresh, Nt]
+#     print(f"find best param thresh = {best_param[0]}, Nt = {best_param[1]}, max_map = {max_map}")
 
 def main():
 
@@ -232,7 +232,7 @@ def main():
     args = parser.parse_args()
 
     # 载入预测结果
-    merge_path_list = glob.glob("/opt/data/private/model_merge/*.csv")
+    merge_path_list = glob.glob("./csv_merge/*.csv")
     # merge_path_list = glob.glob("/opt/data/private/model_merge/results/*.csv")
 
     # 检测地址是否出错
@@ -277,43 +277,9 @@ def main():
     
     # 如果不按类别进行nms
     # result = merge_csv_without_class(data_list, 0.9)
-    save_to_csv(result, "result.csv")
+    save_to_csv(result, "./csv_merge/merged_result.csv")
     
     return
-    # save result
-    if args.is_output:
-        save_to_csv(result, "result.csv")
-        # 最后读取文件进行验证
-        test_data = read_csv_to_numpy("result.csv")
-        result_evalate = test_evaluate(test_data)
-    else:
-        result_evalate = test_evaluate(result)
-    
-    # show_data
-    evaluate_result = []
-    if args.is_compare:
-        # calculate the evaluate result for all csv file
-        evaluate_result = [test_evaluate(dets) for dets in data_list]
-    
-    classes = []
-    columns = ["merge"] + [str(i + 1) for i in range(len(evaluate_result))]
-    data = []
-    for k, v in result_evalate.items():
-        classes.append(k)
-        temp = []
-        temp.append(v)
-        for i in range(len(evaluate_result)):
-            temp.append(evaluate_result[i][k])
-        data.append(temp)
-    show_data = pd.DataFrame(data = data, index = classes, columns = columns)
-
-    for i, path in enumerate(merge_path_list):
-        print(i + 1, path)
-    print(show_data)
-    print(thresh_dict)
-    print(len(result), len(data_list[0]))
-    with open("thresh.txt", 'w') as f:
-        f.write(str(thresh_dict))
         
 if __name__ == "__main__":
     main()
