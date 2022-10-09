@@ -1,15 +1,19 @@
+# python tools/run_net.py --config-file configs/orcnn_van3_for_test.py  # use single GPU for test
+
 dataset_root = '/opt/data/private/LYX/data'
 # model settings
 num_classes = 10
 model = dict(
     type='OrientedRCNN',
-    backbone=dict(
-        type='swin_base',
-        img_size = 1024,
-        pretrained= True),
+    backbone=dict( 
+        type='van_b3',
+        img_size=1024,
+        num_stages=4,
+        out_indices = (0, 1, 2, 3),
+        pretrained= False),  # for test, do not need to load pretrained backbone
     neck=dict(
         type='FPN',
-        in_channels=[128, 256, 512, 1024],
+        in_channels=[64, 128, 320, 512],
         out_channels=256,
         num_outs=5),
     rpn = dict(
@@ -18,8 +22,8 @@ model = dict(
         num_classes=1,
         min_bbox_size=0,
         nms_thresh=0.8,
-        nms_pre=2000,
-        nms_post=2000,
+        nms_pre=4000, # change to 4000
+        nms_post=4000,
         feat_channels=256,
         bbox_type='obb',
         reg_dim=6,
@@ -55,12 +59,11 @@ model = dict(
     ),
     
     bbox_head=dict(
-        type='OrientedEQLv2Head',
+        type='OrientedHead',
         num_classes=num_classes,
         in_channels=256,
         fc_out_channels=1024,
-        score_thresh=0.01,
-        # score_thresh=0.001,
+        score_thresh=0.001,
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
@@ -87,11 +90,8 @@ model = dict(
             extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
         loss_cls=dict(
-            type='EQLv2',
-            gamma=12,
-            mu=0.8,
-            alpha=4.0,
-            num_classes=num_classes),
+            type='CrossEntropyLoss',
+            ),
         loss_bbox=dict(
             type='SmoothL1Loss',
             beta=1.0,
@@ -139,7 +139,7 @@ dataset = dict(
                 to_bgr=False,)
             
         ],
-        batch_size=8,
+        batch_size=16,
         num_workers=8,
         shuffle=True,
         filter_empty_gt=False
@@ -163,13 +163,13 @@ dataset = dict(
                 std = [58.395, 57.12, 57.375],
                 to_bgr=False),
         ],
-        batch_size=16,
+        batch_size=8,
         num_workers=8,
         shuffle=False
     ),
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/test_2_preprocessed_ms/test_1024_200_0.5-1.0-1.5/images', # test_2_preprocessed_ms, testa_3_ms
+        images_dir=f'{dataset_root}/testa_3_ms/test_1024_200_0.5-1.0-1.5/images', #  testa_3_ms
         transforms=[
             dict(
                 type="RotatedResize",
@@ -192,6 +192,7 @@ dataset = dict(
     )
 )
 
+
 optimizer = dict(type='AdamW',  lr=0.0001, weight_decay=0.05)
 
 # learning policy
@@ -209,6 +210,7 @@ scheduler_swa = dict(
     type='CosineAnnealingLR',
     min_lr = 0.000001
     )
+
 logger = dict(
     type="RunLogger")
 
@@ -216,11 +218,11 @@ logger = dict(
 swa_start_epoch = 12
 
 max_epoch = 18
-eval_interval = 1
+eval_interval = 3
 checkpoint_interval = 1
-log_interval = 100
+log_interval = 200
 
-# resume_path = '/opt/data/private/LYX/RS_detection/work_dirs/orcnn_r152_fpn_1-2-4-8_anchor/checkpoints/swa_17-24.pkl'
+resume_path = 'work_dirs/orcnn_van3_7_anchor_swa_1/checkpoints/swa_8-9.pkl'
 # model_only = True
 
 merge_nms_threshold_type = 1 

@@ -59,11 +59,11 @@ model = dict(
     ),
     
     bbox_head=dict(
-        type='OrientedEQLv2Head',
+        type='OrientedHead',
         num_classes=num_classes,
         in_channels=256,
         fc_out_channels=1024,
-        score_thresh=0.001, # test use lower score_thresh
+        score_thresh=0.001,
         assigner=dict(
             type='MaxIoUAssigner',
             pos_iou_thr=0.5,
@@ -90,11 +90,8 @@ model = dict(
             extend_factor=(1.4, 1.2),
             featmap_strides=[4, 8, 16, 32]),
         loss_cls=dict(
-            type='EQLv2',
-            gamma=12,
-            mu=0.8,
-            alpha=4.0,
-            num_classes=num_classes),
+            type='CrossEntropyLoss',
+            ),
         loss_bbox=dict(
             type='SmoothL1Loss',
             beta=1.0,
@@ -225,7 +222,7 @@ eval_interval = 3
 checkpoint_interval = 1
 log_interval = 200
 
-# resume_path = '/opt/data/private/LYX/RS_detection/work_dirs/orcnn_r152_fpn_1-2-4-8_anchor/checkpoints/swa_17-24.pkl'
-# model_only = True
+resume_path = 'work_dirs/orcnn_van3_7_anchor_swa_2/checkpoints/swa_8-9.pkl'
+model_only = True
 
 merge_nms_threshold_type = 1 
