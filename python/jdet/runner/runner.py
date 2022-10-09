@@ -100,7 +100,7 @@ class Runner:
                 # TODO: need remove this
                 # self.val()
                 self.test()
-        self.test()
+        # self.test()
 
     def test_time(self):
         warmup = 10

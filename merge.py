@@ -7,8 +7,6 @@ import argparse
 import glob
 from typing import Union
 import pandas as pd
-sys.path.append("/opt/data/private/github_push/RS_detection/tools")
-# from val import test_evaluate
 
 FAIR1M_1_5_CLASSES = ['Airplane', 'Ship', 'Vehicle', 'Basketball_Court', 'Tennis_Court', 
         "Football_Field", "Baseball_Field", 'Intersection', 'Roundabout', 'Bridge']
@@ -185,101 +183,23 @@ def judge_exist(path_list):
     for each_path in path_list:
         assert os.path.exists(each_path),  "file {} not exits".format(each_path)
 
-# def meshgrid_find_param(thresh_dict, data_list):
-#     """
-#     根据测试数据对参数进行调节(nms)
-#     """
-#     for k, _ in thresh_dict.items():
-#         best_thresh = 0
-#         max_value = 0
-#         for thresh in np.linspace(0,1,21):
-#             thresh_dict[k] = thresh
-#             data = merge_csv_with_class(data_list, thresh_dict)
-#             result = test_evaluate(data)
-#             if result[k + "_AP"] > max_value:
-#                 max_value = result[k + "_AP"]
-#                 best_thresh = thresh
-#         thresh_dict[k] = best_thresh
-#     return thresh_dict
-
-# def soft_nms_find_param(data_list):
-#     best_param = [0, 0]
-#     max_map = 0
-#     for thresh in np.linspace(0,1,11):
-#         for Nt in np.linspace(0,1,11):
-#             data = merge_csv_with_class(data_list, 0, [thresh, Nt])
-#             result = test_evaluate(data)
-#             print(max_map, result["meanAP"])
-#             if result["meanAP"] > max_map:
-#                 max_map = result["meanAP"]
-#                 best_param = [thresh, Nt]
-#     print(f"find best param thresh = {best_param[0]}, Nt = {best_param[1]}, max_map = {max_map}")
-
 def main():
+    for thresh in [0.625]:
+        # 载入预测结果
+        merge_path_list = glob.glob("submit_zips/*.csv")
+        judge_exist(merge_path_list)
+        print(merge_path_list)
+        # 读取所有的文件
+        data_list = [read_csv_to_numpy(path) for path in merge_path_list]
+        # 这里可以传入统一的thresh
+        result = merge_csv_with_class(data_list, thresh)
+        
+        # 如果不按类别进行nms
+        # result = merge_csv_without_class(data_list, 0.9)
+        save_to_csv(result, "./csv_merge/merged_result.csv")
 
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--is_compare",
-        default=False,
-        type=bool
-    )
-    parser.add_argument(
-        "--is_output",
-        default=True,
-        type=bool
-    )
-    args = parser.parse_args()
-
-    # 载入预测结果
-    merge_path_list = glob.glob("./csv_merge/*.csv")
-    # merge_path_list = glob.glob("/opt/data/private/model_merge/results/*.csv")
-
-    # 检测地址是否出错
-    judge_exist(merge_path_list)
-
-    # 读取所有的文件
-    data_list = [read_csv_to_numpy(path) for path in merge_path_list]
-
-    # 通过nms进行融合
-    thresh_dict = {
-              'Airplane': 0.7,
-                  'Ship': 0.7,
-               'Vehicle': 0.7,
-      'Basketball_Court': 0.3,
-          'Tennis_Court': 0.2, 
-        "Football_Field": 0.2,
-        "Baseball_Field": 0.2,
-          'Intersection': 0.4,
-            'Roundabout': 0.2,
-                'Bridge': 0.5
-    }
-    # thresh_dict = {
-    #           'Airplane': 0.75,
-    #               'Ship': 0.70,
-    #            'Vehicle': 0.70,
-    #   'Basketball_Court': 0.25,
-    #       'Tennis_Court': 0.15, 
-    #     "Football_Field": 0.20,
-    #     "Baseball_Field": 0.20,
-    #       'Intersection': 0.35,
-    #         'Roundabout': 0.00,
-    #             'Bridge': 0.50
-    # }
-    # 网络搜索最好的阈值 for nms
-    # thresh_dict = meshgrid_find_param(thresh_dict, data_list)
-
-    # 网络搜索最好的参数 for soft-nms
-    # soft_nms_find_param(data_list)
-
-    # 这里可以传入统一的thresh
-    result = merge_csv_with_class(data_list, thresh_dict)
-    
-    # 如果不按类别进行nms
-    # result = merge_csv_without_class(data_list, 0.9)
-    save_to_csv(result, "./csv_merge/merged_result.csv")
-    
     return
+
         
 if __name__ == "__main__":
     main()
