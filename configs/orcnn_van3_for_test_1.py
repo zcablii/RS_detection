@@ -113,60 +113,6 @@ model = dict(
     
 angle_version = 'le90'
 dataset = dict(
-    train=dict(
-        type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/FAIR1M2.0_v2_extra_gray_color_preprocessed_ms/train_1024_200_0.5-1.0-1.5',
-        transforms=[
-            dict(
-                type="RotatedResize",
-                min_size=1024,
-                max_size=1024,
-                angle_version = angle_version
-            ),
-            dict(type='RotatedRandomFlip', prob=0.5),
-            dict(
-                type="RandomRotateAug",
-                random_rotate_on=True,
-                angle_version = angle_version
-            ),
-            dict(
-                type = "Pad",
-                size_divisor=32),
-            dict(
-                type = "Normalize",
-                mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375],
-                to_bgr=False,)
-            
-        ],
-        batch_size=16,
-        num_workers=8,
-        shuffle=True,
-        filter_empty_gt=False
-    ),
-    val=dict(
-        type="FAIR1M_1_5_Dataset",
-        dataset_dir=f'{dataset_root}/preprocessed_ms/train_1024_200_0.5-1.0-1.5',
-        transforms=[
-            dict(
-                type="RotatedResize",
-                min_size=1024,
-                max_size=1024,
-                angle_version = angle_version
-            ),
-            dict(
-                type = "Pad",
-                size_divisor=32),
-            dict(
-                type = "Normalize",
-                mean =  [123.675, 116.28, 103.53],
-                std = [58.395, 57.12, 57.375],
-                to_bgr=False),
-        ],
-        batch_size=8,
-        num_workers=8,
-        shuffle=False
-    ),
     test=dict(
         type="ImageDataset",
         images_dir=f'{dataset_root}/testa_3_ms/test_1024_200_0.5-1.0-1.5/images', #  testa_3_ms
