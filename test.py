@@ -21,7 +21,7 @@ def main():
         os.rename("%s.bak" % file, file)
     alter("configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py", 'source_fair_dataset_path', 'source_fair_dataset_path="' + args.test_path +'"#')
 
-    if not os.path.exists(args.preprocessed_path):
+    if not os.path.exists('./data/test_ms'):
         os.system('python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py')
     else:
         if len(glob.glob('./data/test_ms/test_1024_200_0.5-1.0-1.5/images/')) == 0:
