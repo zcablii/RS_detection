@@ -115,7 +115,7 @@ angle_version = 'le90'
 dataset = dict(
     test=dict(
         type="ImageDataset",
-        images_dir=f'{dataset_root}/testa_3_ms/test_1024_200_0.5-1.0-1.5/images', #  testa_3_ms
+        images_dir= '../data/testa_ms', #  testa_3_ms
         transforms=[
             dict(
                 type="RotatedResize",
