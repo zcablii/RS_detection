@@ -24,7 +24,7 @@ def main():
     if not os.path.exists(args.preprocessed_path):
         os.system('python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py')
     else:
-        if len(glob.glob(os.path.join(args.preprocessed_path,'test_1024_200_0.5-1.0-1.5/images/'))) == 0:
+        if len(glob.glob('./data/test_ms/test_1024_200_0.5-1.0-1.5/images/')) == 0:
             os.system('python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py')
 
     if not os.path.exists('submit_zips/orcnn_van3_for_test_1_epoch0.csv'):
