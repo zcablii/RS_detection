@@ -1,7 +1,7 @@
 type='FAIR1M_1_5'
-source_fair_dataset_path='/opt/data/private/LYX/data/testa-3sdfs'
-source_dataset_path='/opt/data/private/LYX/data/FAIR1M2.0_dota'
-target_dataset_path='/opt/data/private/LYX/data/FAIR1M2.0_ms'
+source_fair_dataset_path='../data/testa-3'
+source_dataset_path='../datatest_dota'
+target_dataset_path='../data/testa_ms'
 convert_tasks=['test']
 angle_version='le90'
 # available labels: train, val, test, trainval
