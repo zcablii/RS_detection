@@ -86,12 +86,23 @@ python tools/get_SWA_model.py --model_dir work_dirs/orcnn_van3_7_anchor_swa_1/ch
 python tools/get_SWA_model.py --model_dir work_dirs/orcnn_van3_7_anchor_swa_2/checkpoints/ --starting_model_id 8 --ending_model_id 9 --save_dir work_dirs/orcnn_van3_7_anchor_swa_2/checkpoints/
 ```
 
-#### 预训练模型
+### 预训练模型
 我们使用了在Imagenet上预训练的Visual Attention Network（VAN）作为骨干网络，VAN权重文件可在 `https://huggingface.co/Visual-Attention-Network/VAN-Large-original/resolve/main/van_large_839.pth.tar` 下载。
 
 ## 3 模型测试
 **测试前请确保RS_detection文件夹下没有submit_zips和data文件夹。当换测试集时，请确保删除submit_zips和data文件夹。**
-#### 测试数据处理：
+
+进入RS_detection文件夹后，进入Jittor虚拟环境：
+```shell
+    cd ~/RS_detection
+    source activate jittor
+```
+
+### 3.1 快速测试：
+处理测试数据和运行测试操作而得到最终结果可直接通过运行 `python test.py --test_path PATH_TO_TEST` 来实现。其中 `PATH_TO_TEST` 为解压后测试集目录，且需要遵循**测试数据处理**中的文件结构。`test.py`脚本包含**测试数据处理**和**运行测试**两个阶段，具体如下所述。
+
+
+### 3.2 测试数据处理：
 解压测试数据后修改成以下形式：
 ```
     {DATASET_PATH}
@@ -114,7 +125,7 @@ python tools/get_SWA_model.py --model_dir work_dirs/orcnn_van3_7_anchor_swa_2/ch
 其中source_fair_dataset_path设为测试数据集的路径。并运行
 `python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py`，即可自动进行测试数据预处理。
 
-#### 运行测试:
+### 3.3 运行测试:
 修改 `./configs/orcnn_van3_for_test_1.py` 和`./configs/orcnn_van3_for_test_2.py` config 文件，把 `dataset_root` 改成数据存放路径，即`fair1m_1_5_preprocess_config_ms_le90_test.py`中的`target_dataset_path`，并根据具体情况修改训练集和测试集的数据目录。然后运行：
 ```shell
 python tools/run_net.py --config-file configs/orcnn_van3_for_test_1.py --task test
@@ -126,5 +137,3 @@ python merge.py
 ```
 完成对两个模型输出结果的融合。
 最终结果将被存放于`./csv_merge/merged_result.csv`，提交线上可以得到mAP为0.8111的结果。
-
-**为了简化测试流程，运行以上处理测试数据和测试操作也可通过直接运行 `python test.py --test_path PATH_TO_TEST` 来实现。**
