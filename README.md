@@ -1,139 +1,218 @@
-## 0 环境安装：
+# JDet
+## Introduction
+JDet is an object detection benchmark based on [Jittor](https://github.com/Jittor/jittor), and mainly focus on aerial image object detection (oriented object detection). 
 
+<!-- **Features**
+- Automatic compilation. Our framwork is based on Jittor, which means we don't need to Manual compilation for these code with CUDA and C++.
+-  -->
 
+<!-- Framework details are avaliable in the [framework.md](docs/framework.md) -->
+## Install
+JDet environment requirements:
+
+* System: **Linux**(e.g. Ubuntu/CentOS/Arch), **macOS**, or **Windows Subsystem of Linux (WSL)**
+* Python version >= 3.7
+* CPU compiler (require at least one of the following)
+    * g++ (>=5.4.0)
+    * clang (>=8.0)
+* GPU compiler (optional)
+    * nvcc (>=10.0 for g++ or >=10.2 for clang)
+* GPU library: cudnn-dev (recommend tar file installation, [reference link](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html#installlinux-tar))
+
+**Step 1: Install the requirements**
 ```shell
-https://github.com/zcablii/RS_detection.git # 克隆代码
-cd RS_detection
-python -m pip install -r requirements.txt # 安装环境
+git clone https://github.com/zcablii/JDet
+cd JDet
+python -m pip install -r requirements.txt
+```
+If you have any installation problems for Jittor, please refer to [Jittor](https://github.com/Jittor/jittor)
+
+**Step 2: Install JDet**
+ 
+```shell
+cd JDet
+# suggest this 
 python setup.py develop
+# or
+python setup.py install
 ```
+If you don't have permission for install,please add ```--user```.
 
-
-## 1 数据集处理:
-
-我们的训练模型是在 FAIR1M2.0 遥感监测数据集的基础上训练的，数据集可在https://www.gaofen-challenge.com/benchmark 下载获得。
-
-FAIR1M2.0 数据集包含train， validation 和 test集，我们将有标签的train和validation合并，并命名为train_color，并将数据集中分辨率大于2,500 * 2500 的进行灰度化处理，并将灰度化的副本单独存放为train_gray用于后续处理。
-
-
-train_color和train_gray修改成以下形式：
-
-    {DATASET_PATH}
-        |
-        └──data
-            |
-            ├train_color
-            |   |
-            |   └──train
-            |     ├──images
-            |     |    ├──1.tif
-            |     |    └──...
-            |     └──labelXml
-            |          ├──1.xml
-            |          └──...
-            | 
-            └train_gray
-                |
-                └──train
-                    ├──images
-                    |    ├──1.tif
-                    |    └──...
-                    └──labelXml
-                        ├──1.xml
-                        └──...
-
-
-其中`{DATASET_PATH}`为数据集路径，用户可以自行选择。
-
-**注意：直接解压数据集得到的文件树可能与说明不同（如labelXml、test的名称），请将其修改为说明中的格式。**
-
-进入`configs/preprocess/fair1m_1_5_preprocess_config.py`文件，修改这个文件中的三个路径参数为
-
-```python
-source_fair_dataset_path='{DATASET_PATH}/data'
-source_dataset_path='{DATASET_PATH}/dota'
-target_dataset_path='{DATASET_PATH}/preprocessed'
-```
-
-在`configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_train_color.py` 中修改以下三个数据路径参数, 其中`{DATASET_PATH}`与前一步相同。
-```python
-    source_fair_dataset_path='{DATASET_PATH}/data/train_color'
-    source_dataset_path='{DATASET_PATH}/dota_train_color'
-    target_dataset_path='{DATASET_PATH}/preprocessed_train_color'
-```
-并运行`python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_train_color.py`，即可自动进行FAIR1M2.0数据预处理。
-
-相似的，修改和运行`configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_train_gray.py`，即可自动进行灰度图的数据预处理。
-最后将处理后的train_color 与 train_gray 合并，作为本次比赛的train训练集（本报告后续提及的train数据默认指此数据集）。
-
-下载比赛官方提供的测试集并解压，通过修改和运行`configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py`即可自动进行测试的数据预处理。
-
-## 2 模型训练:
-
-修改 `./configs/orcnn_van3_7_anchor_swa_1.py` 和`./configs/orcnn_van3_7_anchor_swa_2.py` config 文件，把 `dataset_root` 改成数据存放路径，并根据具体情况修改训练集和测试集的数据目录。
-
-这两个配置文件所训练的模型完全相同，我们训练两个模型的目的是为了后期进行模型融合。两个模型都训练9个epoch，lr初始为0.0001，其于第8个epoch下降10倍。
-
-单个模型训练在8卡上进行：
+Or use ```PYTHONPATH```: 
+You can add ```export PYTHONPATH=$PYTHONPATH:{you_own_path}/JDet/python``` into ```.bashrc```, and run
 ```shell
-mpirun --allow-run-as-root -np 8 python tools/run_net.py --config-file configs/orcnn_van3_7_anchor_swa_1.py
-mpirun --allow-run-as-root -np 8 python tools/run_net.py --config-file configs/orcnn_van3_7_anchor_swa_2.py
+source .bashrc
 ```
 
-通过对第8和第9个epoch的模型快照进行权重融合生成新的单模型:
+## Getting Started
+
+### Datasets
+The following datasets are supported in JDet, please check the corresponding document before use. 
+
+DOTA1.0/DOTA1.5/DOTA2.0 Dataset: [dota.md](docs/dota.md).
+
+FAIR Dataset: [fair.md](docs/fair.md)
+
+SSDD/SSDD+: [ssdd.md](docs/ssdd.md)
+
+You can also build your own dataset by convert your datas to DOTA format.
+### Config
+JDet defines the used model, dataset and training/testing method by `config-file`, please check the [config.md](docs/config.md) to learn how it works.
+### Train
 ```shell
-python tools/get_SWA_model.py --model_dir work_dirs/orcnn_van3_7_anchor_swa_1/checkpoints/ --starting_model_id 8 --ending_model_id 9 --save_dir work_dirs/orcnn_van3_7_anchor_swa_1/checkpoints/
-python tools/get_SWA_model.py --model_dir work_dirs/orcnn_van3_7_anchor_swa_2/checkpoints/ --starting_model_id 8 --ending_model_id 9 --save_dir work_dirs/orcnn_van3_7_anchor_swa_2/checkpoints/
+python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=train
 ```
 
-### 预训练模型
-我们使用了在Imagenet上预训练的Visual Attention Network（VAN）作为骨干网络，VAN权重文件可在 `https://huggingface.co/Visual-Attention-Network/VAN-Large-original/resolve/main/van_large_839.pth.tar` 下载。
-
-## 3 模型测试
-**测试前请确保RS_detection文件夹下没有submit_zips和data文件夹。当换测试集时，请确保删除submit_zips和data文件夹。**
-
-进入RS_detection文件夹后，进入Jittor虚拟环境：
+### Test
+If you want to test the downloaded trained models, please set ```resume_path={you_checkpointspath}``` in the last line of the config file.
 ```shell
-    cd ~/RS_detection
-    source activate jittor
+python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=test
 ```
-
-### 3.1 快速测试：
-处理测试数据和运行测试操作而得到最终结果可直接通过运行 `python test.py --test_path PATH_TO_TEST` 来实现。其中 `PATH_TO_TEST` 为解压后测试集目录，且需要遵循**测试数据处理**中的文件结构。`test.py`脚本包含**测试数据处理**和**运行测试**两个阶段，具体如下所述。
-
-
-### 3.2 测试数据处理：
-解压测试数据后修改成以下形式：
-```
-    {DATASET_PATH}
-        |
-        └──data 
-            └──test
-                  └──images
-                       ├──1.tif
-                       └──...
-```
-
-其中`{DATASET_PATH}`为数据集路径，用户可以自行选择。
-在
-`configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py` 中修改以下三个数据路径参数
-```python
-    source_fair_dataset_path='{DATASET_PATH}/data'
-    source_dataset_path='{DATASET_PATH}/dota_test'
-    target_dataset_path='{DATASET_PATH}/preprocessed_test'
-```
-其中source_fair_dataset_path设为测试数据集的路径。并运行
-`python tools/preprocess.py --config-file configs/preprocess/fair1m_1_5_preprocess_config_ms_le90_test.py`，即可自动进行测试数据预处理。
-
-### 3.3 运行测试:
-修改 `./configs/orcnn_van3_for_test_1.py` 和`./configs/orcnn_van3_for_test_2.py` config 文件，把 `dataset_root` 改成数据存放路径，即`fair1m_1_5_preprocess_config_ms_le90_test.py`中的`target_dataset_path`，并根据具体情况修改训练集和测试集的数据目录。然后运行：
+### Test on images / Visualization
+You can test and visualize results on your own image sets by:
 ```shell
-python tools/run_net.py --config-file configs/orcnn_van3_for_test_1.py --task test
-python tools/run_net.py --config-file configs/orcnn_van3_for_test_2.py --task test
+python tools/run_net.py --config-file=configs/s2anet_r50_fpn_1x_dota.py --task=vis_test
 ```
-此时，请检查`./submit_zips`文件夹下有且仅有两个文件，分别为`orcnn_van3_for_test_1_epoch0.csv` 和 `orcnn_van3_for_test_2_epoch0.csv`。然后运行
-```shell
-python merge.py
+You can choose the visualization style you prefer, for more details about visualization, please refer to [visualization.md](docs/visualization.md).
+<img src="https://github.com/Jittor/JDet/blob/visualization/docs/images/vis2.jpg?raw=true" alt="Visualization" width="800"/>
+
+### Build a New Project
+In this section, we will introduce how to build a new project(model) with JDet.
+We need to install JDet first, and build a new project by:
+```sh
+mkdir $PROJECT_PATH$
+cd $PROJECT_PATH$
+cp $JDet_PATH$/tools/run_net.py ./
+mkdir configs
 ```
-完成对两个模型输出结果的融合。
-最终结果将被存放于`./csv_merge/merged_result.csv`，提交线上可以得到mAP为0.8111的结果。
+Then we can build and edit `configs/base.py` like `$JDet_PATH$/configs/retinanet.py`.
+If we need to use a new layer, we can define this layer at `$PROJECT_PATH$/layers.py` and import `layers.py` in `$PROJECT_PATH$/run_net.py`, then we can use this layer in config files.
+Then we can train/test this model by:
+```sh
+python run_net.py --config-file=configs/base.py --task=train
+python run_net.py --config-file=configs/base.py --task=test
+```
+
+## Models
+
+|    Models     | Dataset| Sub_Image_Size/Overlap |Train Aug | Test Aug | Optim | Lr schd | mAP    | Paper | Config     | Download   |
+| :-----------: | :-----: |:-----:|:-----:| :-----: | :-----:| :-----:| :----: |:--------:|:--------: | :--------: |
+| S2ANet-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 74.11   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](configs/s2anet/s2anet_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_bs2_steplr_3%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R50-FPN | DOTA1.0| 1024/200| flip+ra90+bc|-|  SGD   |   1x    | 76.40   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R50-FPN | DOTA1.0|1024/200| flip+ra90+bc+ms |ms|  SGD   |   1x    | 79.72   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r50_fpn_1x_dota_rotate_balance_ms.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r50_fpn_1x_dota_rotate_balance_ms%2Fckpt_12.pkl&dl=1) |
+| S2ANet-R101-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 74.28   | [arxiv](https://arxiv.org/abs/2008.09397)| [config](projects/s2anet/configs/s2anet_r101_fpn_1x_dota_bs2.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Fs2anet_r101_fpn_1x_dota_without_torch_pretrained%2Fckpt_12.pkl&dl=1) |
+| Gliding-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 72.93  | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/ebeefa1edaf84a4d8a2a/?dl=1) |
+| Gliding-R50-FPN |DOTA1.0|1024/200|Flip+ra90+bc|-|  SGD   |   1x    | 74.93   | [arxiv](https://arxiv.org/abs/1911.09358)| [config](projects/gliding/configs/gliding_r50_fpn_1x_dota_with_flip_rotate_balance_cate.py) | [model](https://cloud.tsinghua.edu.cn/f/395ecd3ddaf44bb58ac9/?dl=1) |
+| RetinaNet-R50-FPN |DOTA1.0|600/150|-|-|  SGD   |   -    | 62.503   | [arxiv](https://arxiv.org/abs/1708.02002)| [config](configs/retinanet_r50v1d_fpn_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/f12bb566d4be43bfbdc7/) [pretrained](https://cloud.tsinghua.edu.cn/f/6b5db5fdd5304a5abf19/) |
+| FasterRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 69.631   | [arxiv](https://arxiv.org/abs/1506.01497)| [config](configs/faster_rcnn_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/29197095057348d0a392/?dl=1) |
+| RoITransformer-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 73.842   | [arxiv](https://arxiv.org/abs/1812.00155)| [config](configs/faster_rcnn_RoITrans_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/f/55fe6380928f4a6582f8/?dl=1) |
+| FCOS-R50-FPN | DOTA1.0|1024/200| flip|-|  SGD   |   1x    | 70.40   | [ICCV19](https://openaccess.thecvf.com/content_ICCV_2019/papers/Tian_FCOS_Fully_Convolutional_One-Stage_Object_Detection_ICCV_2019_paper.pdf)| [config](configs/fcos_obb_r50_fpn_1x_dota.py) | [model](https://cloud.tsinghua.edu.cn/d/918bcbf7a10a40fb8dee/files/?p=%2Fmodels%2Ffcos_r50%2Fckpt_12.pkl&dl=1) |
+| OrientedRCNN-R50-FPN |DOTA1.0|1024/200|Flip|-|  SGD   |   1x    | 75.62  | [ICCV21](https://openaccess.thecvf.com/content/ICCV2021/papers/Xie_Oriented_R-CNN_for_Object_Detection_ICCV_2021_paper.pdf)| [config](configs/oriented_rcnn_r50_fpn_1x_dota_with_flip.py) | [model](https://cloud.tsinghua.edu.cn/f/a50517f7b8e840949d3f/?dl=1) |
+
+
+**Notice**:
+
+1. ms: multiscale 
+2. flip: random flip
+3. ra: rotate aug
+4. ra90: rotate aug with angle 90,180,270
+5. 1x : 12 epochs
+6. bc: balance category
+7. mAP: mean Average Precision on DOTA1.0 test set
+
+### Plan of Models
+<b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
+
+- :heavy_check_mark: S2ANet
+- :heavy_check_mark: Gliding
+- :heavy_check_mark: RetinaNet
+- :heavy_check_mark: Faster R-CNN
+- :heavy_check_mark: SSD
+- :heavy_check_mark: ROI Transformer
+- :heavy_check_mark: fcos
+- :heavy_check_mark: Oriented R-CNN
+- :heavy_check_mark: YOLOv5
+- :clock3: ReDet
+- :clock3: R3Det
+- :clock3: Cascade R-CNN
+- :heavy_plus_sign: CSL
+- :heavy_plus_sign: DCL
+- :heavy_plus_sign: GWD
+- :heavy_plus_sign: KLD
+- :heavy_plus_sign: Double Head OBB
+- :heavy_plus_sign: Oriented Reppoints
+- :heavy_plus_sign: Guided Anchoring
+- :heavy_plus_sign: ...
+
+### Plan of Datasets
+<b>:heavy_check_mark:Supported  :clock3:Doing :heavy_plus_sign:TODO</b>
+
+- :heavy_check_mark: DOTA1.0
+- :heavy_check_mark: DOTA1.5
+- :heavy_check_mark: DOTA2.0
+- :heavy_check_mark: SSDD
+- :heavy_check_mark: SSDD+
+- :heavy_check_mark: FAIR
+- :heavy_check_mark: COCO
+- :heavy_plus_sign: LS-SSDD
+- :heavy_plus_sign: DIOR-R
+- :heavy_plus_sign: HRSC2016
+- :heavy_plus_sign: ICDAR2015
+- :heavy_plus_sign: ICDAR2017 MLT
+- :heavy_plus_sign: UCAS-AOD
+- :heavy_plus_sign: FDDB
+- :heavy_plus_sign: OHD-SJTU
+- :heavy_plus_sign: MSRA-TD500
+- :heavy_plus_sign: Total-Text
+- :heavy_plus_sign: ...
+
+## Contact Us
+
+
+Website: http://cg.cs.tsinghua.edu.cn/jittor/
+
+Email: jittor@qq.com
+
+File an issue: https://github.com/Jittor/jittor/issues
+
+QQ Group: 761222083
+
+
+<img src="https://cg.cs.tsinghua.edu.cn/jittor/images/news/2020-12-8-21-19-1_2_2/fig4.png" width="200"/>
+
+## The Team
+
+
+JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua.edu.cn/). If you are also interested in JDet and want to improve it, Please join us!
+
+
+## Citation
+
+
+```
+@article{hu2020jittor,
+  title={Jittor: a novel deep learning framework with meta-operators and unified graph execution},
+  author={Hu, Shi-Min and Liang, Dun and Yang, Guo-Ye and Yang, Guo-Wei and Zhou, Wen-Yang},
+  journal={Science China Information Sciences},
+  volume={63},
+  number={222103},
+  pages={1--21},
+  year={2020}
+}
+```
+
+## Reference
+1. [Jittor](https://github.com/Jittor/jittor)
+2. [Detectron2](https://github.com/facebookresearch/detectron2)
+3. [mmdetection](https://github.com/open-mmlab/mmdetection)
+4. [maskrcnn_benchmark](https://github.com/facebookresearch/maskrcnn-benchmark)
+5. [RotationDetection](https://github.com/yangxue0827/RotationDetection)
+6. [s2anet](https://github.com/csuhan/s2anet)
+7. [gliding_vertex](https://github.com/MingtaoFu/gliding_vertex)
+8. [oriented_rcnn](https://github.com/jbwang1997/OBBDetection/tree/master/configs/obb/oriented_rcnn)
+9. [r3det](https://github.com/SJTU-Thinklab-Det/r3det-on-mmdetection)
+10. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
+11. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
+12. [OBBDetection](https://github.com/jbwang1997/OBBDetection)
+
+
