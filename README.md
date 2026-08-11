@@ -1,3 +1,5 @@
+
+
 # JDet
 ## Introduction
 JDet is an object detection benchmark based on [Jittor](https://github.com/Jittor/jittor), and mainly focus on aerial image object detection (oriented object detection). 
@@ -80,13 +82,13 @@ You can choose the visualization style you prefer, for more details about visual
 In this section, we will introduce how to build a new project(model) with JDet.
 We need to install JDet first, and build a new project by:
 ```sh
-mkdir $PROJECT_PATH$
-cd $PROJECT_PATH$
-cp $JDet_PATH$/tools/run_net.py ./
+mkdir $PROJECT_PATH
+cd $PROJECT_PATH
+cp $JDet_PATH/tools/run_net.py ./
 mkdir configs
 ```
-Then we can build and edit `configs/base.py` like `$JDet_PATH$/configs/retinanet.py`.
-If we need to use a new layer, we can define this layer at `$PROJECT_PATH$/layers.py` and import `layers.py` in `$PROJECT_PATH$/run_net.py`, then we can use this layer in config files.
+Then we can build and edit `configs/base.py` like `$JDet_PATH/configs/retinanet.py`.
+If we need to use a new layer, we can define this layer at `$PROJECT_PATH/layers.py` and import `layers.py` in `$PROJECT_PATH/run_net.py`, then we can use this layer in config files.
 Then we can train/test this model by:
 ```sh
 python run_net.py --config-file=configs/base.py --task=train
@@ -214,5 +216,3 @@ JDet is currently maintained by the [Tsinghua CSCG Group](https://cg.cs.tsinghua
 10. [AerialDetection](https://github.com/dingjiansw101/AerialDetection)
 11. [DOTA_devkit](https://github.com/CAPTAIN-WHU/DOTA_devkit)
 12. [OBBDetection](https://github.com/jbwang1997/OBBDetection)
-
-
